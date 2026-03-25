@@ -15,6 +15,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_d3d11va.h>
+#include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
 
@@ -351,14 +352,7 @@ void VideoPlayer::decodeLoop() {
                 if (ret < 0) {
                     break;
                 }
-                const int64_t ptsMs = toMs(frame->best_effort_timestamp, tb);
-                {
-                    std::lock_guard<std::mutex> lock(m_queueMutex);
-                    m_frameQueue.push_back({av_frame_clone(frame), ptsMs});
-                }
-                m_queueCv.notify_all();
-                m_position = ptsMs;
-                emit positionChanged();
+                processFrame(frame, tb);
             }
         }
 
@@ -367,6 +361,46 @@ void VideoPlayer::decodeLoop() {
 
     av_frame_free(&frame);
     av_packet_free(&pkt);
+}
+
+void VideoPlayer::processFrame(AVFrame *frame, const AVRational &tb) {
+    const bool isHw = frame->format == AV_PIX_FMT_D3D11;
+    const int64_t ptsMs = toMs(frame->best_effort_timestamp, tb);
+
+    if (m_renderer) {
+        if (isHw) {
+            ID3D11Texture2D *hwTex = reinterpret_cast<ID3D11Texture2D*>(frame->data[0]);
+            m_renderer->copyFromHwTexture(hwTex);
+        } else {
+            // 软解转 BGRA 上传
+            int width = frame->width;
+            int height = frame->height;
+            m_swBgraStride = width * 4;
+            m_swBgra.resize(static_cast<size_t>(m_swBgraStride * height));
+            uint8_t *dstSlice[4] = { m_swBgra.data(), nullptr, nullptr, nullptr };
+            int dstStride[4] = { m_swBgraStride, 0, 0, 0 };
+            sws_scale(m_swsCtx,
+                      frame->data,
+                      frame->linesize,
+                      0,
+                      height,
+                      dstSlice,
+                      dstStride);
+            m_renderer->uploadBGRA(m_swBgra.data(), m_swBgraStride, width, height);
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        if (m_frameQueue.size() >= kMaxFrames) {
+            av_frame_free(&m_frameQueue.front().frame);
+            m_frameQueue.pop_front();
+        }
+        m_frameQueue.push_back({av_frame_clone(frame), ptsMs});
+    }
+    m_queueCv.notify_all();
+    m_position = ptsMs;
+    emit positionChanged();
 }
 
 bool VideoPlayer::configureVideoSwScale(int width, int height, AVPixelFormat pixFmt) {

@@ -81,6 +81,7 @@ private:
     void decodeLoop();
     void clearFrames();
     int64_t toMs(int64_t pts, AVRational timeBase) const;
+    void processFrame(AVFrame *frame, const AVRational &tb);
 
     bool m_playing{false};
     qint64 m_position{0};
@@ -102,6 +103,9 @@ private:
     QString m_lastError;
     AVBufferRef *m_hwDeviceCtx{nullptr};
     bool m_forceSwDecode{false};
+
+    std::vector<uint8_t> m_swBgra;
+    int m_swBgraStride{0};
 
     std::thread m_decodeThread;
     std::atomic_bool m_stopFlag{false};
