@@ -1,6 +1,7 @@
 #include "VideoPlayer.h"
 #include "Render/D3D11Renderer.h"
 #include <QDebug>
+#include <QProcessEnvironment>
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -11,6 +12,8 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/hwcontext_d3d11va.h>
 #include <libswscale/swscale.h>
 }
 
@@ -38,6 +41,7 @@ bool VideoPlayer::openFile(const QString &path) {
     m_videoWidth = 0;
     m_videoHeight = 0;
     m_videoPixFmt = AV_PIX_FMT_NONE;
+    m_forceSwDecode = QProcessEnvironment::systemEnvironment().contains(QStringLiteral("SIMPLEWINPLAYER_FORCE_SW"));
 
     const QByteArray utf8Path = path.toUtf8();
     AVFormatContext *ctx = nullptr;
@@ -142,6 +146,9 @@ void VideoPlayer::closeInput() {
         sws_freeContext(m_swsCtx);
         m_swsCtx = nullptr;
     }
+    if (m_hwDeviceCtx) {
+        av_buffer_unref(&m_hwDeviceCtx);
+    }
 }
 
 bool VideoPlayer::findStreams() {
@@ -202,25 +209,50 @@ bool VideoPlayer::createVideoDecoder(AVStream *stream) {
         qWarning().noquote() << m_lastError;
         return false;
     }
-    m_videoCodecCtx = avcodec_alloc_context3(codec);
-    if (!m_videoCodecCtx) {
-        m_lastError = QStringLiteral("分配视频解码上下文失败");
-        qWarning().noquote() << m_lastError;
-        return false;
-    }
-    if (avcodec_parameters_to_context(m_videoCodecCtx, par) < 0) {
-        m_lastError = QStringLiteral("拷贝视频参数失败");
-        qWarning().noquote() << m_lastError;
-        return false;
+    auto allocAndConfig = [&](bool attachHw) -> bool {
+        m_videoCodecCtx = avcodec_alloc_context3(codec);
+        if (!m_videoCodecCtx) {
+            m_lastError = QStringLiteral("分配视频解码上下文失败");
+            qWarning().noquote() << m_lastError;
+            return false;
+        }
+        if (avcodec_parameters_to_context(m_videoCodecCtx, par) < 0) {
+            m_lastError = QStringLiteral("拷贝视频参数失败");
+            qWarning().noquote() << m_lastError;
+            return false;
+        }
+
+        m_videoCodecCtx->thread_count = std::max(2, QThread::idealThreadCount());
+        m_videoCodecCtx->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
+
+        if (attachHw && m_hwDeviceCtx) {
+            m_videoCodecCtx->hw_device_ctx = av_buffer_ref(m_hwDeviceCtx);
+            m_videoCodecCtx->get_format = &VideoPlayer::getHwFormat;
+            m_videoCodecCtx->opaque = this;
+        }
+
+        if (avcodec_open2(m_videoCodecCtx, codec, nullptr) < 0) {
+            return false;
+        }
+        return true;
+    };
+
+    bool useHw = !m_forceSwDecode;
+    if (useHw && !createHwDevice()) {
+        useHw = false;
     }
 
-    m_videoCodecCtx->thread_count = std::max(2, QThread::idealThreadCount());
-    m_videoCodecCtx->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
-
-    if (avcodec_open2(m_videoCodecCtx, codec, nullptr) < 0) {
-        m_lastError = QStringLiteral("打开视频解码器失败");
-        qWarning().noquote() << m_lastError;
-        return false;
+    if (useHw && allocAndConfig(true)) {
+        // HW 成功
+    } else {
+        if (m_videoCodecCtx) {
+            avcodec_free_context(&m_videoCodecCtx);
+        }
+        if (!allocAndConfig(false)) {
+            m_lastError = QStringLiteral("打开视频解码器失败");
+            qWarning().noquote() << m_lastError;
+            return false;
+        }
     }
 
     // 软解路径的色彩转换上下文（后续可替换为 D3D11 零拷）
@@ -252,6 +284,10 @@ bool VideoPlayer::createAudioDecoder(AVStream *stream) {
 }
 
 bool VideoPlayer::configureVideoSwScale(int width, int height, AVPixelFormat pixFmt) {
+    if (pixFmt == AV_PIX_FMT_D3D11) {
+        return true; // 硬解路径使用 D3D11 纹理，不在 swscale 中转换
+    }
+
     if (m_swsCtx) {
         sws_freeContext(m_swsCtx);
         m_swsCtx = nullptr;
@@ -265,6 +301,34 @@ bool VideoPlayer::configureVideoSwScale(int width, int height, AVPixelFormat pix
         return false;
     }
     return true;
+}
+
+bool VideoPlayer::createHwDevice() {
+    if (m_hwDeviceCtx) {
+        return true;
+    }
+
+    int ret = av_hwdevice_ctx_create(&m_hwDeviceCtx, AV_HWDEVICE_TYPE_D3D11VA, nullptr, nullptr, 0);
+    if (ret < 0) {
+        qWarning().noquote() << "创建 D3D11VA 硬件设备失败，回退软解:" << QString::fromUtf8(av_err2str(ret));
+        return false;
+    }
+    return true;
+}
+
+enum AVPixelFormat VideoPlayer::getHwFormat(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts) {
+    if (!ctx) return AV_PIX_FMT_NONE;
+    auto *player = reinterpret_cast<VideoPlayer*>(ctx->opaque);
+    Q_UNUSED(player);
+
+    for (const enum AVPixelFormat *p = pix_fmts; *p != AV_PIX_FMT_NONE; ++p) {
+        if (*p == AV_PIX_FMT_D3D11) {
+            return *p;
+        }
+    }
+
+    // 若未发现 D3D11，回退为首选软解格式
+    return pix_fmts ? pix_fmts[0] : AV_PIX_FMT_NONE;
 }
 
 void VideoPlayer::initFFmpeg() {

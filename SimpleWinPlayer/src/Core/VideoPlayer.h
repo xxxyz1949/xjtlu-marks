@@ -6,6 +6,7 @@
 #include <QAtomicInteger>
 #include <QString>
 #include <cstdarg>
+#include <atomic>
 #include <memory>
 #include <mutex>
 
@@ -20,6 +21,7 @@ struct AVStream;
 struct AVPacket;
 struct AVRational;
 struct SwsContext;
+struct AVBufferRef;
 
 class VideoPlayer : public QObject {
     Q_OBJECT
@@ -68,6 +70,8 @@ private:
     bool createVideoDecoder(AVStream *stream);
     bool createAudioDecoder(AVStream *stream);
     bool configureVideoSwScale(int width, int height, AVPixelFormat pixFmt);
+    bool createHwDevice();
+    static enum AVPixelFormat getHwFormat(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts);
 
     bool m_playing{false};
     qint64 m_position{0};
@@ -87,6 +91,8 @@ private:
     int m_videoHeight{0};
     QString m_currentPath;
     QString m_lastError;
+    AVBufferRef *m_hwDeviceCtx{nullptr};
+    bool m_forceSwDecode{false};
 
     static std::once_flag s_ffmpegInitFlag;
 };
