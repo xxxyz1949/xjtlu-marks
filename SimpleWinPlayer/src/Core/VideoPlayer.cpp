@@ -388,6 +388,8 @@ void VideoPlayer::processFrame(AVFrame *frame, const AVRational &tb) {
                       dstStride);
             m_renderer->uploadBGRA(m_swBgra.data(), m_swBgraStride, width, height);
         }
+
+        m_renderer->render();
     }
 
     {
