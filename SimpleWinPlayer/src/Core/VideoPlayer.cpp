@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdio>
 #include <mutex>
+#include <condition_variable>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -42,6 +43,7 @@ bool VideoPlayer::openFile(const QString &path) {
     m_videoHeight = 0;
     m_videoPixFmt = AV_PIX_FMT_NONE;
     m_forceSwDecode = QProcessEnvironment::systemEnvironment().contains(QStringLiteral("SIMPLEWINPLAYER_FORCE_SW"));
+    m_stopFlag = false;
 
     const QByteArray utf8Path = path.toUtf8();
     AVFormatContext *ctx = nullptr;
@@ -92,7 +94,7 @@ void VideoPlayer::play() {
         return;
     m_playing = true;
     emit playingChanged();
-    // TODO: start decode thread
+    startDecodeThread();
 }
 
 void VideoPlayer::pause() {
@@ -100,7 +102,7 @@ void VideoPlayer::pause() {
         return;
     m_playing = false;
     emit playingChanged();
-    // TODO: pause decode thread
+    stopDecodeThread();
 }
 
 void VideoPlayer::seek(qint64 ms) {
@@ -130,6 +132,8 @@ void VideoPlayer::setPlaybackRate(double r) {
 
 void VideoPlayer::stopInternal() {
     m_playing = false;
+    stopDecodeThread();
+    clearFrames();
 }
 
 void VideoPlayer::closeInput() {
@@ -281,6 +285,88 @@ bool VideoPlayer::createAudioDecoder(AVStream *stream) {
         return false;
     }
     return true;
+}
+
+void VideoPlayer::startDecodeThread() {
+    if (!m_formatCtx || !m_videoCodecCtx) {
+        qWarning().noquote() << "尚未打开视频解码器，无法启动解码线程";
+        return;
+    }
+    if (m_decodeThread.joinable()) {
+        return;
+    }
+    m_stopFlag = false;
+    m_decodeThread = std::thread(&VideoPlayer::decodeLoop, this);
+}
+
+void VideoPlayer::stopDecodeThread() {
+    m_stopFlag = true;
+    m_queueCv.notify_all();
+    if (m_decodeThread.joinable()) {
+        m_decodeThread.join();
+    }
+}
+
+void VideoPlayer::clearFrames() {
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    for (auto &f : m_frameQueue) {
+        av_frame_free(&f.frame);
+    }
+    m_frameQueue.clear();
+}
+
+int64_t VideoPlayer::toMs(int64_t pts, AVRational timeBase) const {
+    if (pts == AV_NOPTS_VALUE) return 0;
+    return static_cast<int64_t>(pts * av_q2d(timeBase) * 1000.0);
+}
+
+void VideoPlayer::decodeLoop() {
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
+    const AVRational tb = m_formatCtx->streams[m_videoStream]->time_base;
+
+    while (!m_stopFlag) {
+        {
+            std::unique_lock<std::mutex> lock(m_queueMutex);
+            m_queueCv.wait(lock, [&] { return m_stopFlag || m_frameQueue.size() < kMaxFrames; });
+            if (m_stopFlag) break;
+        }
+
+        int ret = av_read_frame(m_formatCtx, pkt);
+        if (ret == AVERROR_EOF) {
+            avcodec_send_packet(m_videoCodecCtx, nullptr);
+        } else if (ret < 0) {
+            continue;
+        }
+
+        if (pkt->stream_index == m_videoStream || ret == AVERROR_EOF) {
+            if (ret != AVERROR_EOF) {
+                avcodec_send_packet(m_videoCodecCtx, pkt);
+            }
+            while (!m_stopFlag) {
+                ret = avcodec_receive_frame(m_videoCodecCtx, frame);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+                    break;
+                }
+                if (ret < 0) {
+                    break;
+                }
+                const int64_t ptsMs = toMs(frame->best_effort_timestamp, tb);
+                {
+                    std::lock_guard<std::mutex> lock(m_queueMutex);
+                    m_frameQueue.push_back({av_frame_clone(frame), ptsMs});
+                }
+                m_queueCv.notify_all();
+                m_position = ptsMs;
+                emit positionChanged();
+            }
+        }
+
+        av_packet_unref(pkt);
+    }
+
+    av_frame_free(&frame);
+    av_packet_free(&pkt);
 }
 
 bool VideoPlayer::configureVideoSwScale(int width, int height, AVPixelFormat pixFmt) {

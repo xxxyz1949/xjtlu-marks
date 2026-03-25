@@ -9,6 +9,10 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <thread>
+#include <condition_variable>
+#include <deque>
+#include <chrono>
 
 extern "C" {
 #include <libavutil/pixfmt.h>
@@ -72,6 +76,11 @@ private:
     bool configureVideoSwScale(int width, int height, AVPixelFormat pixFmt);
     bool createHwDevice();
     static enum AVPixelFormat getHwFormat(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts);
+    void startDecodeThread();
+    void stopDecodeThread();
+    void decodeLoop();
+    void clearFrames();
+    int64_t toMs(int64_t pts, AVRational timeBase) const;
 
     bool m_playing{false};
     qint64 m_position{0};
@@ -93,6 +102,17 @@ private:
     QString m_lastError;
     AVBufferRef *m_hwDeviceCtx{nullptr};
     bool m_forceSwDecode{false};
+
+    std::thread m_decodeThread;
+    std::atomic_bool m_stopFlag{false};
+    std::condition_variable m_queueCv;
+    std::mutex m_queueMutex;
+    struct FrameItem {
+        AVFrame *frame{nullptr};
+        int64_t ptsMs{0};
+    };
+    std::deque<FrameItem> m_frameQueue;
+    const size_t kMaxFrames = 8;
 
     static std::once_flag s_ffmpegInitFlag;
 };
