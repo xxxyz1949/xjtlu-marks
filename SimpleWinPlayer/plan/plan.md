@@ -91,9 +91,14 @@
 - 错误处理：坏/不支持文件提示不中止；日志区分硬解创建失败/解码/I-O 错误，可自动切软解或中止。
 
 **提交/推送流程（Tower + GitHub）**
-- 原则：每完成一个 Micro task 且测试通过就提交；提交原子化，备注测试结果。
-- 流程（Tower）：1) 完成子任务+测试 → stage 相关文件 → 写信息型 commit（如 "feat: add d3d11va hwcontext setup" / "fix: seek resume <500ms"）；2) push 到 GitHub（main 或 feature）；3) 未达标则继续修复后再提交。
-- 模板：feat/fix/test 前缀；单次提交保持可运行且已验证。
+- 原则：每完成一个元任务并通过对应测试后立即提交并 push；若为测试修复同样提交并 push；提交保持原子、可运行。
+- 具体步骤：
+	1) 保存：Ctrl+S 全部文件。
+	2) 暂存：源代码控制面板逐个点击 +，或在根目录执行 `git add .`（或精确文件）。
+	3) 提交：提交消息格式固定为 `feat: 完成[元任务名称]`（测试修复可用 `fix:`/`test:` 但仍建议写清元任务名）；确保描述已测场景。
+	4) 推送：点击「同步更改」或执行 `git push origin master`（或当前分支）。
+- 若远端提示仓库重定向，执行一次 `git remote set-url origin https://github.com/xxxyz1949/SimpleWinPlayer.git` 后继续使用 origin。
+- 单次提交保持可运行且已验证；未达标先修复再提交。
 
 **决策**
 - 仅 Windows，vcpkg x64-windows-static 静态链接
