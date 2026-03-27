@@ -6,6 +6,9 @@ from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
 
+FIXED_TOTAL_STUDENTS = 3006
+
+
 def apply_page_style() -> None:
     st.markdown(
         """
@@ -76,7 +79,7 @@ def render_header() -> None:
         <div class="hint-card">
             当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
             已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
-            固定展示参数：rho = 0.75；评分口径仍为 99 分封顶量化（score/99）。
+            固定参数：rho = 0.75，总人数 = 3006；评分口径仍为 99 分封顶量化（score/99）。
         </div>
         """,
         unsafe_allow_html=True,
@@ -93,9 +96,9 @@ def validate_scores(score1: int, score2: int, total_students: int):
         errors.append("MTH013 分数必须在 0 到 99 之间。")
 
     if score1 < 20:
-        warnings.append("MTH007 分数较低，请确认是否输入正确。")
+        warnings.append(f"低分提醒：MTH007 当前为 {int(score1)} 分（仅提醒，不影响计算）。")
     if score2 < 20:
-        warnings.append("MTH013 分数较低，请确认是否输入正确。")
+        warnings.append(f"低分提醒：MTH013 当前为 {int(score2)} 分（仅提醒，不影响计算）。")
 
     if total_students <= 0:
         errors.append("总人数必须为正整数。")
@@ -172,7 +175,15 @@ def main() -> None:
         left, right, third = st.columns([1, 1, 1], gap="small")
         score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
         score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-        total_students = third.number_input("总人数", min_value=1, max_value=200000, value=3006, step=1, format="%d")
+        total_students = third.number_input(
+            "总人数（固定）",
+            min_value=FIXED_TOTAL_STUDENTS,
+            max_value=FIXED_TOTAL_STUDENTS,
+            value=FIXED_TOTAL_STUDENTS,
+            step=1,
+            format="%d",
+            disabled=True,
+        )
         submitted = st.form_submit_button("一键估算排名", use_container_width=True)
 
     if submitted:
