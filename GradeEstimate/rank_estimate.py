@@ -11,10 +11,13 @@ FREQ1 = np.array([176, 116, 348, 526, 584, 658, 607, 485])
 N2 = 3009
 MU2 = 73
 FREQ2 = np.array([43, 16, 123, 270, 555, 937, 887, 178])
+MAX_SCORE = 99.0
 SECOND_CALIBRATION_THRESHOLD = 82.0
 SECOND_CALIBRATION_ALPHA = 4.2
 SECOND_CALIBRATION_GAMMA = 0.9
-MAX_SCORE = 100.0
+MID_HIGH_CLUSTER_CENTER = 86.0
+MID_HIGH_CLUSTER_SIGMA = 1.1
+MID_HIGH_CLUSTER_STRENGTH = 0.9
 
 
 def _build_joint_avg_distribution() -> dict:
@@ -29,7 +32,7 @@ def _build_joint_avg_distribution() -> dict:
 
         for i, f in enumerate(freq):
             left = int(BIN_EDGES[i])
-            right = int(BIN_EDGES[i + 1]) + (1 if i == len(freq) - 1 else 0)
+            right = int(BIN_EDGES[i + 1])
             width = right - left
             if width <= 0:
                 continue
@@ -45,6 +48,7 @@ def _build_joint_avg_distribution() -> dict:
     sum_scores = np.arange(sum_pmf.size)
     scores = sum_scores / 2.0
     probs = sum_pmf / sum_pmf.sum()
+    probs = _apply_mid_high_cluster(probs, scores)
     cdf = np.cumsum(probs)
 
     return {
@@ -52,6 +56,15 @@ def _build_joint_avg_distribution() -> dict:
         "probs": probs,
         "cdf": cdf,
     }
+
+
+def _apply_mid_high_cluster(probs: np.ndarray, scores: np.ndarray) -> np.ndarray:
+    """在 85~87 附近加入局部拥挤度，反映该分段人数偏多。"""
+    gauss = np.exp(-0.5 * ((scores - MID_HIGH_CLUSTER_CENTER) / MID_HIGH_CLUSTER_SIGMA) ** 2)
+    bump = 1.0 + MID_HIGH_CLUSTER_STRENGTH * gauss
+    adjusted = probs * bump
+    adjusted /= adjusted.sum()
+    return adjusted
 
 
 DIST = _build_joint_avg_distribution()
@@ -74,7 +87,7 @@ def _compute_base_stats() -> dict:
 
 
 def _quantize(score: float) -> float:
-    """Map score to quantified value in [0, 1] where 100 -> 1."""
+    """Map score to quantified value in [0, 1] where 99 -> 1."""
     return float(score) / MAX_SCORE
 
 
@@ -118,7 +131,7 @@ def _smoothed_higher_ratio(avg_score: float) -> tuple[float, float]:
         return higher_ratio, cdf_leq
 
     if avg_score > high_score:
-        # 将高分尾段外推到 cdf=1，避免高分段直接坍缩到 rank 1。
+        # 将 95~99 之间外推到 cdf=1，避免高分段直接坍缩到 rank 1。
         t = (avg_score - high_score) / (high_anchor_x - high_score)
         cdf_leq = cdf_high + t * (1.0 - cdf_high)
         higher_ratio = max(0.0, min(1.0, 1.0 - cdf_leq))
@@ -170,7 +183,7 @@ def get_rank_curve(
 
 
 def _apply_second_calibration(avg_score: float, upper_tail: float) -> float:
-    """二次校准：高分段尾部膨胀，避免 98/100 等样例在小样本下塌缩到 rank 1。"""
+    """二次校准：高分段尾部膨胀，避免 98/99 等样例在小样本下塌缩到 rank 1。"""
     if avg_score < SECOND_CALIBRATION_THRESHOLD:
         return upper_tail
 
@@ -229,7 +242,7 @@ def calculate_rank(
     rank = max(1, min(total_students, rank))
     beat_ratio = cdf_leq
 
-    # 业务硬约束：双科都达到最高分(100)时，名次直接判定为第1名。
+    # 业务硬约束：双科都达到最高分(99)时，名次直接判定为第1名。
     if score1 >= MAX_SCORE and score2 >= MAX_SCORE:
         upper_tail = 0.0
         beat_ratio = 1.0
@@ -278,7 +291,7 @@ if __name__ == "__main__":
     print(f"MTH007 -> mean: {MU1}, std(est): {base['std1']:.2f}")
     print(f"MTH013 -> mean: {MU2}, std(est): {base['std2']:.2f}")
     print(f"Your average score: {(score1 + score2) / 2:.2f}")
-    print(f"Quantized average (100 -> 1): {((score1 + score2) / 2) / MAX_SCORE:.4f}")
+    print(f"Quantized average (99 -> 1): {((score1 + score2) / 2) / MAX_SCORE:.4f}")
     print("-" * 40)
     print(f">>> Estimated ranking under different rho values (discrete model, base students: {total_students}) <<<")
 

@@ -53,6 +53,6 @@ def generate_plot(
 
 if __name__ == "__main__":
 	output_path = "E:/GradeEstimate/distribution_visual.png"
-	chart = generate_plot(100, 100, total_students=3006, smooth=True, use_second_calibration=True, rho=0.75)
+	chart = generate_plot(99, 99, total_students=3006, smooth=True, use_second_calibration=True, rho=0.75)
 	chart.savefig(output_path, dpi=300)
 	print(f"Saved plot to: {output_path}")
