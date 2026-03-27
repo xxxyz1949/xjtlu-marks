@@ -184,6 +184,14 @@ def main() -> None:
             format="%d",
             disabled=True,
         )
+        last_input = st.session_state.get("last_submitted_input")
+        if last_input is not None:
+            changed = (
+                int(score1) != int(last_input["score1"])
+                or int(score2) != int(last_input["score2"])
+            )
+            if changed:
+                st.info("你已修改分数，但尚未重新估算。下方提示/结果仍是上一次点击“一键估算排名”的输入。")
         submitted = st.form_submit_button("一键估算排名", use_container_width=True)
 
     if submitted:
@@ -192,8 +200,13 @@ def main() -> None:
             for msg in errors:
                 st.error(msg)
         else:
+            st.session_state["last_submitted_input"] = {
+                "score1": int(score1),
+                "score2": int(score2),
+                "total_students": int(total_students),
+            }
             for msg in warnings:
-                st.warning(msg)
+                st.warning(f"（基于本次提交输入）{msg}")
             register_prediction()
             render_result(score1, score2, total_students=total_students, rho=0.75)
     else:
