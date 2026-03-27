@@ -189,8 +189,11 @@ def main() -> None:
 
     if "last_submitted_input" not in st.session_state:
         st.session_state["last_submitted_input"] = None
+    if "last_valid_result_input" not in st.session_state:
+        st.session_state["last_valid_result_input"] = None
 
     last_submitted = st.session_state["last_submitted_input"]
+    last_valid_result = st.session_state["last_valid_result_input"]
     current_input = {
         "score1": int(score1),
         "score2": int(score2),
@@ -203,19 +206,20 @@ def main() -> None:
                 st.error(msg)
         else:
             st.session_state["last_submitted_input"] = current_input
+            st.session_state["last_valid_result_input"] = current_input
             for msg in warnings:
                 st.warning(msg)
             register_prediction()
             render_result(score1, score2, rho=0.75)
     else:
-        if last_submitted is None:
+        if last_valid_result is None:
             st.info("填写分数后点击“一键估算排名”查看结果。")
-        elif current_input != last_submitted:
-            st.info(
-                "你已修改输入，但尚未重新估算。当前页面不展示旧结果，请点击“一键估算排名”获取最新结果。"
-            )
+        elif current_input != last_valid_result:
+            st.info("你已修改输入，但尚未重新估算。当前展示的是上一次有效预测结果。")
+            render_result(last_valid_result["score1"], last_valid_result["score2"], rho=0.75)
         else:
-            st.info("点击“一键估算排名”可再次计算当前输入。")
+            st.info("当前输入与上次预测一致，已展示最新结果。")
+            render_result(current_input["score1"], current_input["score2"], rho=0.75)
 
 
 if __name__ == "__main__":
