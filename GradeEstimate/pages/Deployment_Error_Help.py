@@ -89,4 +89,13 @@ if st.button("运行 preflight_check.py", use_container_width=True):
         st.error("Preflight 未通过，请按上方错误类型逐项排查")
     st.code(output.strip() or "(no output)", language="text")
 
+st.subheader("可复制排障命令")
+troubleshoot_cmds = """python GradeEstimate/preflight_check.py
+python -m streamlit run GradeEstimate/app.py
+git status --short -- GradeEstimate
+git log --max-count=10 --oneline
+"""
+st.code(troubleshoot_cmds.strip(), language="bash")
+st.caption("可直接复制以上命令到终端，逐条执行定位问题。")
+
 st.info("若 Cloud 仍失败，请把 Deployment logs 复制到这里继续诊断。")
