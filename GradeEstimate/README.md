@@ -12,7 +12,7 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Model path: A+B (percentile lookup first, then linear interpolation inside segments).
 - Second calibration enabled: high-score tail inflation to reduce top-end rank collapse.
 - Fixed correlation coefficient: rho = 0.75.
-- Quantized scoring model: `quantized_score = score / 99`, so input 99 gives 1.
+- Quantized scoring model: `quantized_score = score / 100`, so input 100 gives 1.
 - Plot labels are in English to avoid cloud font issues.
 - Visual deployment error help page in Streamlit pages.
 - Semi-automatic Cloud log diagnosis with prioritized repair checklist.
@@ -75,18 +75,18 @@ After app starts, open the Streamlit page named `Cloud Checklist` in the left pa
 
 ## Model Notes
 
-- Base population still defaults to 3006 (user editable).
-- Maximum score is treated as 99 for quantization.
+- Base population is fixed at 3006 in the current UI.
+- Maximum score is treated as 100 for quantization.
 - Joint average-score distribution is constructed from grouped frequencies of MTH007 and MTH013.
 - Main ranking path is data-driven discrete lookup (A) with optional segment interpolation (B).
-- Secondary calibration adjusts high-score tail for better separation near 98-99.
+- Secondary calibration adjusts high-score tail for better separation near 98-100.
 - Competition rank is computed by strict higher-score ratio: `rank = floor(total * P(score > x)) + 1`.
-- Hard constraint: `99/99 -> rank #1`.
+- Hard constraint: `100/100 -> rank #1`.
 
 ## Smoke Test
 
 Suggested checks:
 
-- `99/99` should always return `#1`.
+- `100/100` should always return `#1`.
 - Same input score pair should return exactly the same rank across runs.
-- High-score inputs like `98/99` should be more stable than Gaussian-tail behavior.
+- High-score inputs like `98/100` should be more stable than Gaussian-tail behavior.

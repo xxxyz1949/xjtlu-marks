@@ -78,8 +78,8 @@ def render_header() -> None:
         """
         <div class="hint-card">
             当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
-            已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
-            固定参数：rho = 0.75，总人数 = 3006；评分口径仍为 99 分封顶量化（score/99）。
+            已启用二次校准：高分段尾部拉开，避免 98/100 与 100/100 过度重叠。
+            固定参数：rho = 0.75，总人数 = 3006；评分口径为 100 分封顶量化（score/100）。
         </div>
         """,
         unsafe_allow_html=True,
@@ -90,10 +90,10 @@ def validate_scores(score1: int, score2: int, total_students: int):
     errors = []
     warnings = []
 
-    if not (0 <= score1 <= 99):
-        errors.append("MTH007 分数必须在 0 到 99 之间。")
-    if not (0 <= score2 <= 99):
-        errors.append("MTH013 分数必须在 0 到 99 之间。")
+    if not (0 <= score1 <= 100):
+        errors.append("MTH007 分数必须在 0 到 100 之间。")
+    if not (0 <= score2 <= 100):
+        errors.append("MTH013 分数必须在 0 到 100 之间。")
 
     if score1 < 20:
         warnings.append(f"低分提醒：MTH007 当前为 {int(score1)} 分（仅提醒，不影响计算）。")
@@ -117,7 +117,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
 
     st.caption(
         f"双科平均分: {result['avg_score']:.2f} | 相关系数 rho: {result['rho']:.2f} | "
-        f"量化均分: {result['q_avg_score']:.4f} (99→1) | 模型: {result['model_mode']}"
+        f"量化均分: {result['q_avg_score']:.4f} (100→1) | 模型: {result['model_mode']}"
     )
     st.caption("并列名次规则：同分同名次，后续名次按人数跳号。")
 
@@ -126,7 +126,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
         f"MTH007: {result['score1']}\n"
         f"MTH013: {result['score2']}\n"
         f"Average score: {result['avg_score']:.2f}\n"
-        f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
+        f"Quantized average(score/100): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
         f"Model mode: {result['model_mode']}\n"
         f"Estimated rank: #{result['rank']}\n"
@@ -173,8 +173,8 @@ def main() -> None:
 
     with st.form("score_form"):
         left, right, third = st.columns([1, 1, 1], gap="small")
-        score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-        score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+        score1 = left.number_input("MTH007 分数", min_value=0, max_value=100, value=0, step=1, format="%d")
+        score2 = right.number_input("MTH013 分数", min_value=0, max_value=100, value=0, step=1, format="%d")
         total_students = third.number_input(
             "总人数（固定）",
             min_value=FIXED_TOTAL_STUDENTS,
