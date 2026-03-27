@@ -74,14 +74,14 @@ def render_header() -> None:
     st.markdown(
         """
         <div class="hint-card">
-            固定模型参数：rho = 0.75，参考人数 3009。采用 99 分封顶量化（score/99），即 99 → 1。
+            固定模型参数：rho = 0.75。采用 99 分封顶量化（score/99），即 99 → 1。
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def validate_scores(score1: float, score2: float):
+def validate_scores(score1: int, score2: int, total_students: int):
     errors = []
     warnings = []
 
@@ -95,11 +95,14 @@ def validate_scores(score1: float, score2: float):
     if score2 < 20:
         warnings.append("MTH013 分数较低，请确认是否输入正确。")
 
+    if total_students <= 0:
+        errors.append("总人数必须为正整数。")
+
     return errors, warnings
 
 
-def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
-    result = calculate_rank(score1, score2, rho=rho)
+def render_result(score1: int, score2: int, total_students: int, rho: float = 0.75) -> None:
+    result = calculate_rank(score1, score2, total_students=total_students, rho=rho)
 
     st.subheader("预测结果")
     col1, col2, col3 = st.columns(3)
@@ -114,8 +117,8 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
 
     report_text = (
         "XJTLU Marks Rank Estimator Report\n"
-        f"MTH007: {result['score1']:.2f}\n"
-        f"MTH013: {result['score2']:.2f}\n"
+        f"MTH007: {result['score1']}\n"
+        f"MTH013: {result['score2']}\n"
         f"Average score: {result['avg_score']:.2f}\n"
         f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
@@ -155,13 +158,14 @@ def main() -> None:
         st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
     with st.form("score_form"):
-        left, right = st.columns([1, 1], gap="small")
-        score1 = left.number_input("MTH007 分数", min_value=0.0, max_value=99.0, value=93.0, step=0.5)
-        score2 = right.number_input("MTH013 分数", min_value=0.0, max_value=99.0, value=93.0, step=0.5)
+        left, right, third = st.columns([1, 1, 1], gap="small")
+        score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+        score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+        total_students = third.number_input("总人数", min_value=1, max_value=200000, value=3006, step=1, format="%d")
         submitted = st.form_submit_button("一键估算排名", use_container_width=True)
 
     if submitted:
-        errors, warnings = validate_scores(score1, score2)
+        errors, warnings = validate_scores(score1, score2, total_students)
         if errors:
             for msg in errors:
                 st.error(msg)
@@ -169,7 +173,7 @@ def main() -> None:
             for msg in warnings:
                 st.warning(msg)
             register_prediction()
-            render_result(score1, score2, rho=0.75)
+            render_result(score1, score2, total_students=total_students, rho=0.75)
     else:
         st.info("填写分数后点击“一键估算排名”查看结果。")
 

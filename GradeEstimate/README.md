@@ -5,6 +5,8 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 ## Features
 
 - Input two course scores and estimate rank instantly.
+- Integer-only inputs for scores and total population.
+- Default initial inputs: `0`, `0`, `3006`.
 - Uses a normal-distribution-based combined model.
 - Fixed correlation coefficient: rho = 0.75.
 - Quantized scoring model: `quantized_score = score / 99`, so input 99 gives 1.

@@ -35,9 +35,12 @@ def _quantize(score: float) -> float:
     return float(score) / MAX_SCORE
 
 
-def calculate_rank(score1: float, score2: float, rho: float = 0.75) -> dict:
-    """根据两科成绩和相关系数，返回排名估计结果。"""
+def calculate_rank(score1: int, score2: int, total_students: int = 3006, rho: float = 0.75) -> dict:
+    """根据两科整数成绩、总人数和相关系数，返回排名估计结果。"""
     stats_base = _compute_base_stats()
+    score1 = int(score1)
+    score2 = int(score2)
+    total_students = int(total_students)
     avg_score = (score1 + score2) / 2
 
     q_score1 = _quantize(score1)
@@ -59,7 +62,7 @@ def calculate_rank(score1: float, score2: float, rho: float = 0.75) -> dict:
     z = (q_avg_score - q_mu_s) / q_std_s
     upper_tail = 1 - stats.norm.cdf(z)
     beat_ratio = 1 - upper_tail
-    rank = int(stats_base["total_students"] * upper_tail) + 1
+    rank = int(total_students * upper_tail) + 1
 
     # 业务硬约束：双科都达到最高分(99)时，名次直接判定为第1名。
     if score1 >= MAX_SCORE and score2 >= MAX_SCORE:
@@ -77,7 +80,7 @@ def calculate_rank(score1: float, score2: float, rho: float = 0.75) -> dict:
         "upper_tail": upper_tail,
         "std_s": q_std_s,
         "mu_s": stats_base["mu_s"],
-        "total_students": stats_base["total_students"],
+        "total_students": total_students,
         "std1": stats_base["std1"],
         "std2": stats_base["std2"],
         "max_score": MAX_SCORE,
@@ -90,8 +93,9 @@ def calculate_rank(score1: float, score2: float, rho: float = 0.75) -> dict:
 
 
 if __name__ == "__main__":
-    score1 = 99
-    score2 = 99
+    score1 = 0
+    score2 = 0
+    total_students = 3006
     rhos = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9]
     base = _compute_base_stats()
 
@@ -100,12 +104,10 @@ if __name__ == "__main__":
     print(f"Your average score: {(score1 + score2) / 2:.2f}")
     print(f"Quantized average (99 -> 1): {((score1 + score2) / 2) / MAX_SCORE:.4f}")
     print("-" * 40)
-    print(
-        f">>> Estimated ranking under different rho values (base students: {base['total_students']}) <<<"
-    )
+    print(f">>> Estimated ranking under different rho values (base students: {total_students}) <<<")
 
     for rho in rhos:
-        result = calculate_rank(score1, score2, rho=rho)
+        result = calculate_rank(score1, score2, total_students=total_students, rho=rho)
         print(
             f"rho = {rho:.2f}: quantized std(avg)={result['q_std_s']:.4f}, "
             f"beat={result['beat_ratio'] * 100:.2f}%, rank≈#{result['rank']}"
