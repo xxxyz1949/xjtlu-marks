@@ -9,6 +9,7 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Fixed correlation coefficient: rho = 0.75.
 - Plot labels are in English to avoid cloud font issues.
 - Visual deployment error help page in Streamlit pages.
+- Semi-automatic Cloud log diagnosis with prioritized repair checklist.
 - One-click version/changelog generation via Release Center.
 - Lightweight runtime analytics (in-memory, no database).
 

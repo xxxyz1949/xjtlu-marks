@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+import re
 
 import streamlit as st
 
@@ -26,6 +27,89 @@ def suggest_fixes(fail_lines: list[str]) -> list[str]:
         suggestions.append("先执行下方可复制排障命令，再把完整日志贴回排障页分析。")
 
     return suggestions
+
+
+def classify_cloud_log(log_text: str) -> list[tuple[str, str, str]]:
+    """Return matched categories as (code, title, reason)."""
+    text = log_text.lower()
+    matched: list[tuple[str, str, str]] = []
+
+    rules = [
+        (
+            "missing_module",
+            "依赖缺失",
+            r"modulenotfounderror|no module named",
+        ),
+        (
+            "missing_entry",
+            "入口文件路径错误",
+            r"file not found|no such file|can't open file.*app\.py|main file path",
+        ),
+        (
+            "pip_install_failed",
+            "依赖安装失败",
+            r"failed building wheel|pip.*error|could not build wheels",
+        ),
+        (
+            "syntax_error",
+            "代码语法错误",
+            r"syntaxerror|indentationerror|taberror",
+        ),
+        (
+            "runtime_import",
+            "运行时导入异常",
+            r"importerror|dll load failed",
+        ),
+    ]
+
+    for code, title, pattern in rules:
+        if re.search(pattern, text):
+            matched.append((code, title, pattern))
+
+    return matched
+
+
+def fix_commands_for(code: str) -> list[str]:
+    mapping = {
+        "missing_module": [
+            "python -m pip install -r GradeEstimate/requirements.txt",
+            "python GradeEstimate/preflight_check.py",
+        ],
+        "missing_entry": [
+            "# Streamlit Cloud Main file path 应设为 GradeEstimate/app.py",
+            "git ls-files | rg \"GradeEstimate/app.py\"",
+        ],
+        "pip_install_failed": [
+            "python -m pip install -U pip",
+            "python -m pip install -r GradeEstimate/requirements.txt",
+        ],
+        "syntax_error": [
+            "python -m py_compile GradeEstimate/app.py",
+            "python GradeEstimate/preflight_check.py",
+        ],
+        "runtime_import": [
+            "python GradeEstimate/preflight_check.py",
+            "python -m streamlit run GradeEstimate/app.py",
+        ],
+    }
+    return mapping.get(code, ["python GradeEstimate/preflight_check.py"])
+
+
+def build_repair_checklist(categories: list[tuple[str, str, str]]) -> str:
+    if not categories:
+        return "[1] 先粘贴 Cloud 部署日志\n[2] 点击分析日志\n[3] 根据建议执行修复命令"
+
+    lines = ["# Repair Checklist", ""]
+    priority = 1
+    used = set()
+    for code, title, _ in categories:
+        lines.append(f"{priority}. [{title}]")
+        for cmd in fix_commands_for(code):
+            if cmd not in used:
+                lines.append(f"   - {cmd}")
+                used.add(cmd)
+        priority += 1
+    return "\n".join(lines)
 
 
 st.set_page_config(page_title="Deployment Error Help", page_icon="🛠️", layout="centered")
@@ -132,6 +216,36 @@ if LAST_REPORT_FILE.exists():
     st.code(last_report.strip(), language="text")
 else:
     st.info("尚无历史 preflight 报告，先点击上方按钮执行一次。")
+
+st.subheader("Cloud 日志半自动诊断")
+cloud_log = st.text_area(
+    "粘贴 Streamlit Cloud deployment logs",
+    height=220,
+    placeholder="把 Cloud 日志原文粘贴到这里，然后点击下方按钮分析。",
+)
+
+if st.button("分析日志并生成修复清单", use_container_width=True):
+    if not cloud_log.strip():
+        st.warning("请先粘贴日志内容。")
+    else:
+        categories = classify_cloud_log(cloud_log)
+        if categories:
+            st.error(f"识别到 {len(categories)} 类可疑错误")
+            for idx, (_, title, pattern) in enumerate(categories, start=1):
+                st.markdown(f"{idx}. **{title}**")
+                st.caption(f"匹配规则: /{pattern}/")
+        else:
+            st.info("未识别到标准错误模式，建议先执行 preflight 与本地启动验证。")
+
+        st.markdown("**建议修复命令模板**")
+        cmd_lines = []
+        for code, _, _ in categories:
+            cmd_lines.extend(fix_commands_for(code))
+        if cmd_lines:
+            st.code("\n".join(dict.fromkeys(cmd_lines)), language="bash")
+
+        st.markdown("**可复制修复清单（按优先级）**")
+        st.code(build_repair_checklist(categories), language="text")
 
 st.subheader("可复制排障命令")
 troubleshoot_cmds = """python GradeEstimate/preflight_check.py
