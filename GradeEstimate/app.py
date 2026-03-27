@@ -124,7 +124,11 @@ def validate_scores(score1: int, score2: int):
 
 
 def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
-    result = calculate_rank(score1, score2, total_students=FIXED_TOTAL_STUDENTS, rho=rho)
+    try:
+        result = calculate_rank(score1, score2, total_students=FIXED_TOTAL_STUDENTS, rho=rho)
+    except Exception:
+        st.error("预测结果计算失败，请点击“一键估算排名”重试。")
+        return
 
     st.subheader("预测结果")
     col1, col2, col3 = st.columns(3)
@@ -157,8 +161,14 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
         mime="text/plain",
     )
 
-    chart_png = build_plot_png(score1, score2, rho)
-    st.image(chart_png, use_container_width=True)
+    with st.expander("分布图（按需加载，手机端建议需要时再展开）", expanded=False):
+        st.caption("图表加载失败不会影响上方名次结果。")
+        try:
+            with st.spinner("正在生成分布图..."):
+                chart_png = build_plot_png(score1, score2, rho)
+            st.image(chart_png, use_container_width=True)
+        except Exception:
+            st.warning("分布图生成失败，请稍后重试；名次结果已正常给出。")
 
 
 def main() -> None:
