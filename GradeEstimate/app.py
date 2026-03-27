@@ -35,6 +35,23 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
         f"联合分布标准差: {result['std_s']:.2f}"
     )
 
+    report_text = (
+        "XJTLU Marks Rank Estimator Report\n"
+        f"MTH007: {result['score1']:.2f}\n"
+        f"MTH013: {result['score2']:.2f}\n"
+        f"Average score: {result['avg_score']:.2f}\n"
+        f"rho: {result['rho']:.2f}\n"
+        f"Estimated rank: #{result['rank']}\n"
+        f"Beat ratio: {result['beat_ratio'] * 100:.2f}%\n"
+        f"Base students: {result['total_students']}\n"
+    )
+    st.download_button(
+        "下载本次预测结果",
+        data=report_text,
+        file_name="rank_prediction_report.txt",
+        mime="text/plain",
+    )
+
     fig = generate_plot(score1, score2, rho=rho)
     st.pyplot(fig, clear_figure=True, use_container_width=True)
 
