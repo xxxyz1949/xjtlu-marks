@@ -6,6 +6,9 @@ from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
 
+FIXED_TOTAL_STUDENTS = 3006
+
+
 def apply_page_style() -> None:
     st.markdown(
         """
@@ -84,7 +87,7 @@ def render_header() -> None:
     )
 
 
-def validate_scores(score1: int, score2: int, total_students: int):
+def validate_scores(score1: int, score2: int):
     errors = []
     warnings = []
 
@@ -98,14 +101,11 @@ def validate_scores(score1: int, score2: int, total_students: int):
     if score2 < 20:
         warnings.append("MTH013 分数较低，请确认是否输入正确。")
 
-    if total_students <= 0:
-        errors.append("总人数必须为正整数。")
-
     return errors, warnings
 
 
-def render_result(score1: int, score2: int, total_students: int, rho: float = 0.75) -> None:
-    result = calculate_rank(score1, score2, total_students=total_students, rho=rho)
+def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
+    result = calculate_rank(score1, score2, total_students=FIXED_TOTAL_STUDENTS, rho=rho)
 
     st.subheader("预测结果")
     col1, col2, col3 = st.columns(3)
@@ -141,7 +141,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
     fig = generate_plot(
         score1,
         score2,
-        total_students=total_students,
+        total_students=FIXED_TOTAL_STUDENTS,
         smooth=True,
         use_second_calibration=True,
         rho=rho,
@@ -169,10 +169,10 @@ def main() -> None:
         st.caption(f"会话开始: {start_text}")
         st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
-    left, right, third = st.columns([1, 1, 1], gap="small")
+    left, right = st.columns([1, 1], gap="small")
     score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
     score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-    total_students = third.number_input("总人数", min_value=1, max_value=200000, value=3006, step=1, format="%d")
+    st.caption(f"总人数固定为 {FIXED_TOTAL_STUDENTS}（不可修改）")
     submitted = st.button("一键估算排名", use_container_width=True, type="primary")
 
     if "last_submitted_input" not in st.session_state:
@@ -182,11 +182,10 @@ def main() -> None:
     current_input = {
         "score1": int(score1),
         "score2": int(score2),
-        "total_students": int(total_students),
     }
 
     if submitted:
-        errors, warnings = validate_scores(score1, score2, total_students)
+        errors, warnings = validate_scores(score1, score2)
         if errors:
             for msg in errors:
                 st.error(msg)
@@ -195,7 +194,7 @@ def main() -> None:
             for msg in warnings:
                 st.warning(msg)
             register_prediction()
-            render_result(score1, score2, total_students=total_students, rho=0.75)
+            render_result(score1, score2, rho=0.75)
     else:
         if last_submitted is None:
             st.info("填写分数后点击“一键估算排名”查看结果。")
