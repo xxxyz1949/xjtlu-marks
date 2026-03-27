@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 import re
+import datetime as dt
 
 import streamlit as st
 
@@ -29,42 +30,64 @@ def suggest_fixes(fail_lines: list[str]) -> list[str]:
     return suggestions
 
 
-def classify_cloud_log(log_text: str) -> list[tuple[str, str, str]]:
-    """Return matched categories as (code, title, reason)."""
+def classify_cloud_log(log_text: str) -> list[dict]:
+    """Return matched categories with confidence scoring."""
     text = log_text.lower()
-    matched: list[tuple[str, str, str]] = []
+    matched: list[dict] = []
 
     rules = [
         (
             "missing_module",
             "依赖缺失",
             r"modulenotfounderror|no module named",
+            0.25,
         ),
         (
             "missing_entry",
             "入口文件路径错误",
             r"file not found|no such file|can't open file.*app\.py|main file path",
+            0.20,
         ),
         (
             "pip_install_failed",
             "依赖安装失败",
             r"failed building wheel|pip.*error|could not build wheels",
+            0.22,
         ),
         (
             "syntax_error",
             "代码语法错误",
             r"syntaxerror|indentationerror|taberror",
+            0.28,
         ),
         (
             "runtime_import",
             "运行时导入异常",
             r"importerror|dll load failed",
+            0.20,
         ),
     ]
 
-    for code, title, pattern in rules:
-        if re.search(pattern, text):
-            matched.append((code, title, pattern))
+    for code, title, pattern, weight in rules:
+        hit_count = len(re.findall(pattern, text))
+        if hit_count > 0:
+            confidence = min(0.45 + 0.12 * hit_count + weight, 0.98)
+            if confidence >= 0.8:
+                level = "高"
+            elif confidence >= 0.6:
+                level = "中"
+            else:
+                level = "低"
+            matched.append(
+                {
+                    "code": code,
+                    "title": title,
+                    "pattern": pattern,
+                    "hits": hit_count,
+                    "confidence": confidence,
+                    "level": level,
+                }
+            )
 
     return matched
 
@@ -95,14 +118,16 @@ def fix_commands_for(code: str) -> list[str]:
     return mapping.get(code, ["python GradeEstimate/preflight_check.py"])
 
 
-def build_repair_checklist(categories: list[tuple[str, str, str]]) -> str:
+def build_repair_checklist(categories: list[dict]) -> str:
     if not categories:
         return "[1] 先粘贴 Cloud 部署日志\n[2] 点击分析日志\n[3] 根据建议执行修复命令"
 
     lines = ["# Repair Checklist", ""]
     priority = 1
     used = set()
-    for code, title, _ in categories:
+    for item in categories:
+        code = item["code"]
+        title = item["title"]
         lines.append(f"{priority}. [{title}]")
         for cmd in fix_commands_for(code):
             if cmd not in used:
@@ -110,6 +135,43 @@ def build_repair_checklist(categories: list[tuple[str, str, str]]) -> str:
                 used.add(cmd)
         priority += 1
     return "\n".join(lines)
+
+
+def build_diagnosis_report(log_source: str, categories: list[dict], raw_log: str) -> str:
+    now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [
+        "# Deployment Diagnosis Report",
+        f"Generated at: {now}",
+        f"Log source: {log_source}",
+        f"Log size: {len(raw_log)} chars",
+        "",
+        "## Detected Categories",
+    ]
+
+    if not categories:
+        lines.append("- None")
+    else:
+        for idx, item in enumerate(categories, start=1):
+            lines.append(
+                f"{idx}. {item['title']} | confidence={item['confidence']:.2f} ({item['level']}) | hits={item['hits']}"
+            )
+
+    lines.append("")
+    lines.append("## Suggested Commands")
+    used = set()
+    for item in categories:
+        for cmd in fix_commands_for(item["code"]):
+            if cmd not in used:
+                lines.append(f"- {cmd}")
+                used.add(cmd)
+    if not used:
+        lines.append("- python GradeEstimate/preflight_check.py")
+
+    lines.append("")
+    lines.append("## Raw Log (first 2000 chars)")
+    lines.append(raw_log[:2000] if raw_log else "(empty)")
+
+    return "\n".join(lines) + "\n"
 
 
 st.set_page_config(page_title="Deployment Error Help", page_icon="🛠️", layout="centered")
@@ -218,34 +280,72 @@ else:
     st.info("尚无历史 preflight 报告，先点击上方按钮执行一次。")
 
 st.subheader("Cloud 日志半自动诊断")
+uploaded_log = st.file_uploader(
+    "上传 Cloud 日志文件（.txt / .log）",
+    type=["txt", "log"],
+    accept_multiple_files=False,
+)
+
+uploaded_text = ""
+if uploaded_log is not None:
+    uploaded_text = uploaded_log.getvalue().decode("utf-8", errors="replace")
+    st.success(f"已读取日志文件：{uploaded_log.name}")
+
 cloud_log = st.text_area(
     "粘贴 Streamlit Cloud deployment logs",
     height=220,
     placeholder="把 Cloud 日志原文粘贴到这里，然后点击下方按钮分析。",
+    value=uploaded_text,
 )
 
+active_log = cloud_log.strip()
+if active_log:
+    with st.expander("日志预览（前40行）"):
+        preview = "\n".join(active_log.splitlines()[:40])
+        st.code(preview, language="text")
+
 if st.button("分析日志并生成修复清单", use_container_width=True):
-    if not cloud_log.strip():
+    if not active_log:
         st.warning("请先粘贴日志内容。")
     else:
-        categories = classify_cloud_log(cloud_log)
-        if categories:
-            st.error(f"识别到 {len(categories)} 类可疑错误")
-            for idx, (_, title, pattern) in enumerate(categories, start=1):
-                st.markdown(f"{idx}. **{title}**")
-                st.caption(f"匹配规则: /{pattern}/")
-        else:
-            st.info("未识别到标准错误模式，建议先执行 preflight 与本地启动验证。")
+        categories = classify_cloud_log(active_log)
+        st.session_state["diag_categories"] = categories
+        st.session_state["diag_source"] = uploaded_log.name if uploaded_log is not None else "textbox"
+        st.session_state["diag_report"] = build_diagnosis_report(
+            st.session_state["diag_source"], categories, active_log
+        )
 
-        st.markdown("**建议修复命令模板**")
-        cmd_lines = []
-        for code, _, _ in categories:
-            cmd_lines.extend(fix_commands_for(code))
-        if cmd_lines:
-            st.code("\n".join(dict.fromkeys(cmd_lines)), language="bash")
+if "diag_categories" in st.session_state:
+    categories = st.session_state["diag_categories"]
+    if categories:
+        st.error(f"识别到 {len(categories)} 类可疑错误")
+        for idx, item in enumerate(categories, start=1):
+            st.markdown(
+                f"{idx}. **{item['title']}** | 置信度: {item['confidence']:.2f} ({item['level']}) | 命中: {item['hits']}"
+            )
+            st.caption(f"匹配规则: /{item['pattern']}/")
+    else:
+        st.info("未识别到标准错误模式，建议先执行 preflight 与本地启动验证。")
 
-        st.markdown("**可复制修复清单（按优先级）**")
-        st.code(build_repair_checklist(categories), language="text")
+    st.markdown("**建议修复命令模板**")
+    cmd_lines = []
+    for item in categories:
+        cmd_lines.extend(fix_commands_for(item["code"]))
+    if cmd_lines:
+        st.code("\n".join(dict.fromkeys(cmd_lines)), language="bash")
+
+    st.markdown("**可复制修复清单（按优先级）**")
+    st.code(build_repair_checklist(categories), language="text")
+
+    report_text = st.session_state.get("diag_report", "")
+    if report_text:
+        st.download_button(
+            "下载诊断报告",
+            data=report_text,
+            file_name="deployment_diagnosis_report.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
 
 st.subheader("可复制排障命令")
 troubleshoot_cmds = """python GradeEstimate/preflight_check.py

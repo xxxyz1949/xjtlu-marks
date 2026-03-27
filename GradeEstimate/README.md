@@ -10,6 +10,8 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Plot labels are in English to avoid cloud font issues.
 - Visual deployment error help page in Streamlit pages.
 - Semi-automatic Cloud log diagnosis with prioritized repair checklist.
+- Cloud log file upload (.txt/.log) and confidence scoring.
+- One-click export for diagnosis report.
 - One-click version/changelog generation via Release Center.
 - Lightweight runtime analytics (in-memory, no database).
 
