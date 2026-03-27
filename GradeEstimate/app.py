@@ -4,6 +4,23 @@ from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
 
+def validate_scores(score1: float, score2: float):
+    errors = []
+    warnings = []
+
+    if not (0 <= score1 <= 100):
+        errors.append("MTH007 分数必须在 0 到 100 之间。")
+    if not (0 <= score2 <= 100):
+        errors.append("MTH013 分数必须在 0 到 100 之间。")
+
+    if score1 < 20:
+        warnings.append("MTH007 分数较低，请确认是否输入正确。")
+    if score2 < 20:
+        warnings.append("MTH013 分数较低，请确认是否输入正确。")
+
+    return errors, warnings
+
+
 def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
     result = calculate_rank(score1, score2, rho=rho)
 
@@ -35,7 +52,14 @@ def main() -> None:
         submitted = st.form_submit_button("一键估算排名")
 
     if submitted:
-        render_result(score1, score2, rho=0.75)
+        errors, warnings = validate_scores(score1, score2)
+        if errors:
+            for msg in errors:
+                st.error(msg)
+        else:
+            for msg in warnings:
+                st.warning(msg)
+            render_result(score1, score2, rho=0.75)
     else:
         st.info("填写分数后点击“一键估算排名”查看结果。")
 
