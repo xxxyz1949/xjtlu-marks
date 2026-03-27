@@ -6,9 +6,6 @@ from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
 
-FIXED_TOTAL_STUDENTS = 3006
-
-
 def apply_page_style() -> None:
     st.markdown(
         """
@@ -78,8 +75,9 @@ def render_header() -> None:
         """
         <div class="hint-card">
             当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
-            已启用二次校准：高分段尾部拉开，避免 98/100 与 100/100 过度重叠。
-            固定参数：rho = 0.75，总人数 = 3006；评分口径为 100 分封顶量化（score/100）。
+            已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
+            已启用 85-87 分段聚集修正：体现该分段人数偏多、名次更拥挤。
+            固定展示参数：rho = 0.75；评分口径仍为 99 分封顶量化（score/99）。
         </div>
         """,
         unsafe_allow_html=True,
@@ -90,15 +88,15 @@ def validate_scores(score1: int, score2: int, total_students: int):
     errors = []
     warnings = []
 
-    if not (0 <= score1 <= 100):
-        errors.append("MTH007 分数必须在 0 到 100 之间。")
-    if not (0 <= score2 <= 100):
-        errors.append("MTH013 分数必须在 0 到 100 之间。")
+    if not (0 <= score1 <= 99):
+        errors.append("MTH007 分数必须在 0 到 99 之间。")
+    if not (0 <= score2 <= 99):
+        errors.append("MTH013 分数必须在 0 到 99 之间。")
 
     if score1 < 20:
-        warnings.append(f"低分提醒：MTH007 当前为 {int(score1)} 分（仅提醒，不影响计算）。")
+        warnings.append("MTH007 分数较低，请确认是否输入正确。")
     if score2 < 20:
-        warnings.append(f"低分提醒：MTH013 当前为 {int(score2)} 分（仅提醒，不影响计算）。")
+        warnings.append("MTH013 分数较低，请确认是否输入正确。")
 
     if total_students <= 0:
         errors.append("总人数必须为正整数。")
@@ -117,7 +115,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
 
     st.caption(
         f"双科平均分: {result['avg_score']:.2f} | 相关系数 rho: {result['rho']:.2f} | "
-        f"量化均分: {result['q_avg_score']:.4f} (100→1) | 模型: {result['model_mode']}"
+        f"量化均分: {result['q_avg_score']:.4f} (99→1) | 模型: {result['model_mode']}"
     )
     st.caption("并列名次规则：同分同名次，后续名次按人数跳号。")
 
@@ -126,7 +124,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
         f"MTH007: {result['score1']}\n"
         f"MTH013: {result['score2']}\n"
         f"Average score: {result['avg_score']:.2f}\n"
-        f"Quantized average(score/100): {result['q_avg_score']:.4f}\n"
+        f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
         f"Model mode: {result['model_mode']}\n"
         f"Estimated rank: #{result['rank']}\n"
@@ -171,28 +169,21 @@ def main() -> None:
         st.caption(f"会话开始: {start_text}")
         st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
-    with st.form("score_form"):
-        left, right, third = st.columns([1, 1, 1], gap="small")
-        score1 = left.number_input("MTH007 分数", min_value=0, max_value=100, value=0, step=1, format="%d")
-        score2 = right.number_input("MTH013 分数", min_value=0, max_value=100, value=0, step=1, format="%d")
-        total_students = third.number_input(
-            "总人数（固定）",
-            min_value=FIXED_TOTAL_STUDENTS,
-            max_value=FIXED_TOTAL_STUDENTS,
-            value=FIXED_TOTAL_STUDENTS,
-            step=1,
-            format="%d",
-            disabled=True,
-        )
-        last_input = st.session_state.get("last_submitted_input")
-        if last_input is not None:
-            changed = (
-                int(score1) != int(last_input["score1"])
-                or int(score2) != int(last_input["score2"])
-            )
-            if changed:
-                st.info("你已修改分数，但尚未重新估算。下方提示/结果仍是上一次点击“一键估算排名”的输入。")
-        submitted = st.form_submit_button("一键估算排名", use_container_width=True)
+    left, right, third = st.columns([1, 1, 1], gap="small")
+    score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    total_students = third.number_input("总人数", min_value=1, max_value=200000, value=3006, step=1, format="%d")
+    submitted = st.button("一键估算排名", use_container_width=True, type="primary")
+
+    if "last_submitted_input" not in st.session_state:
+        st.session_state["last_submitted_input"] = None
+
+    last_submitted = st.session_state["last_submitted_input"]
+    current_input = {
+        "score1": int(score1),
+        "score2": int(score2),
+        "total_students": int(total_students),
+    }
 
     if submitted:
         errors, warnings = validate_scores(score1, score2, total_students)
@@ -200,17 +191,20 @@ def main() -> None:
             for msg in errors:
                 st.error(msg)
         else:
-            st.session_state["last_submitted_input"] = {
-                "score1": int(score1),
-                "score2": int(score2),
-                "total_students": int(total_students),
-            }
+            st.session_state["last_submitted_input"] = current_input
             for msg in warnings:
-                st.warning(f"（基于本次提交输入）{msg}")
+                st.warning(msg)
             register_prediction()
             render_result(score1, score2, total_students=total_students, rho=0.75)
     else:
-        st.info("填写分数后点击“一键估算排名”查看结果。")
+        if last_submitted is None:
+            st.info("填写分数后点击“一键估算排名”查看结果。")
+        elif current_input != last_submitted:
+            st.info(
+                "你已修改输入，但尚未重新估算。当前页面不展示旧结果，请点击“一键估算排名”获取最新结果。"
+            )
+        else:
+            st.info("点击“一键估算排名”可再次计算当前输入。")
 
 
 if __name__ == "__main__":
