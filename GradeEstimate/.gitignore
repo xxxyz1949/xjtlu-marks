@@ -1,4 +1,5 @@
 distribution_visual.png
 result.txt
+.preflight_last.txt
 __pycache__/
 *.pyc
