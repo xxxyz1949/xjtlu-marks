@@ -40,6 +40,18 @@ if version_file.exists():
     )
     st.code(release_cmd, language="bash")
 
+    st.subheader("完整发布命令（可一键复制）")
+    full_publish_cmd = (
+        "python GradeEstimate/release_tools.py\n"
+        "git add GradeEstimate/VERSION GradeEstimate/CHANGELOG_SUMMARY.md\n"
+        f"git commit -m \"chore: release {suggested_tag}\"\n"
+        "git push origin master\n"
+        f"git tag {suggested_tag}\n"
+        f"git push origin {suggested_tag}"
+    )
+    st.code(full_publish_cmd, language="bash")
+    st.caption("提示：代码块右上角复制图标可直接复制完整命令。")
+
 if changelog_file.exists():
     st.subheader("当前更新摘要")
     st.text(changelog_file.read_text(encoding="utf-8"))
