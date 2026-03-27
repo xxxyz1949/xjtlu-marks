@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime as dt
 
 import streamlit as st
 
@@ -21,10 +22,23 @@ if st.button("一键生成版本号与更新日志摘要", use_container_width=T
 
 version_file = Path(__file__).resolve().parents[1] / "VERSION"
 changelog_file = Path(__file__).resolve().parents[1] / "CHANGELOG_SUMMARY.md"
+today = dt.datetime.now().strftime("%Y%m%d")
 
 if version_file.exists():
     st.subheader("当前版本")
-    st.code(version_file.read_text(encoding="utf-8"), language="text")
+    current_version = version_file.read_text(encoding="utf-8").strip()
+    st.code(current_version, language="text")
+
+    suggested_tag = f"v{current_version}-{today}"
+    st.subheader("自动标签建议")
+    st.code(suggested_tag, language="text")
+
+    st.subheader("建议发布命令")
+    release_cmd = (
+        f"git tag {suggested_tag}\n"
+        f"git push origin {suggested_tag}"
+    )
+    st.code(release_cmd, language="bash")
 
 if changelog_file.exists():
     st.subheader("当前更新摘要")
