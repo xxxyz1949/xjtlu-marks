@@ -1,4 +1,5 @@
 import streamlit as st
+import datetime as dt
 
 from analytics import register_prediction, register_visit, snapshot
 from rank_estimate import calculate_rank
@@ -148,6 +149,9 @@ def main() -> None:
         st.metric("运行期总访问", stats["total_visits"])
         st.metric("运行期总预测", stats["total_predictions"])
         st.metric("本会话预测次数", stats["session_predictions"])
+        start_text = dt.datetime.fromtimestamp(stats["session_start_ts"]).strftime("%H:%M:%S")
+        st.caption(f"会话开始: {start_text}")
+        st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
     with st.form("score_form"):
         left, right = st.columns([1, 1], gap="small")
