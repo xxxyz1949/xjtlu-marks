@@ -8,6 +8,9 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Uses a normal-distribution-based combined model.
 - Fixed correlation coefficient: rho = 0.75.
 - Plot labels are in English to avoid cloud font issues.
+- Visual deployment error help page in Streamlit pages.
+- One-click version/changelog generation via Release Center.
+- Lightweight runtime analytics (in-memory, no database).
 
 ## Local Run
 
@@ -27,6 +30,12 @@ Optional preflight check before deploy:
 
 ```bash
 python GradeEstimate/preflight_check.py
+```
+
+One-click release assets:
+
+```bash
+python GradeEstimate/release_tools.py
 ```
 
 3. Open browser:

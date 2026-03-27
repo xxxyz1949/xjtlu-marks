@@ -1,5 +1,6 @@
 import streamlit as st
 
+from analytics import register_prediction, register_visit, snapshot
 from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
@@ -133,6 +134,7 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="XJTLU Marks Rank Estimator", page_icon="📊", layout="wide")
+    register_visit()
     apply_page_style()
     render_header()
 
@@ -140,6 +142,12 @@ def main() -> None:
         st.subheader("导航")
         st.write("可在左侧页面列表打开 Cloud Checklist 页面。")
         st.write("发布前可运行 preflight_check.py 进行一键检查。")
+        stats = snapshot()
+        st.divider()
+        st.subheader("轻量访问统计")
+        st.metric("运行期总访问", stats["total_visits"])
+        st.metric("运行期总预测", stats["total_predictions"])
+        st.metric("本会话预测次数", stats["session_predictions"])
 
     with st.form("score_form"):
         left, right = st.columns([1, 1], gap="small")
@@ -155,6 +163,7 @@ def main() -> None:
         else:
             for msg in warnings:
                 st.warning(msg)
+            register_prediction()
             render_result(score1, score2, rho=0.75)
     else:
         st.info("填写分数后点击“一键估算排名”查看结果。")

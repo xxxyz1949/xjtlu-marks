@@ -8,10 +8,13 @@ from pathlib import Path
 REQUIRED_MODULES = ["streamlit", "numpy", "scipy", "matplotlib"]
 REQUIRED_FILES = [
     Path("GradeEstimate/app.py"),
+    Path("GradeEstimate/analytics.py"),
     Path("GradeEstimate/rank_estimate.py"),
     Path("GradeEstimate/plot_visual.py"),
     Path("GradeEstimate/requirements.txt"),
     Path("GradeEstimate/pages/Cloud_Checklist.py"),
+    Path("GradeEstimate/pages/Deployment_Error_Help.py"),
+    Path("GradeEstimate/pages/Release_Center.py"),
 ]
 
 
