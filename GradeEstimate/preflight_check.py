@@ -10,6 +10,7 @@ LAST_REPORT_FILE = Path("GradeEstimate/.preflight_last.txt")
 REQUIRED_FILES = [
     Path("GradeEstimate/app.py"),
     Path("GradeEstimate/analytics.py"),
+    Path("GradeEstimate/deploy_tools.py"),
     Path("GradeEstimate/rank_estimate.py"),
     Path("GradeEstimate/plot_visual.py"),
     Path("GradeEstimate/requirements.txt"),

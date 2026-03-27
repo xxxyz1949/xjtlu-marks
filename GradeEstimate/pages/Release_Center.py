@@ -3,6 +3,7 @@ import datetime as dt
 
 import streamlit as st
 
+from deploy_tools import one_click_deploy
 from release_tools import generate_release_assets
 
 
@@ -55,3 +56,38 @@ if version_file.exists():
 if changelog_file.exists():
     st.subheader("当前更新摘要")
     st.text(changelog_file.read_text(encoding="utf-8"))
+
+st.divider()
+st.subheader("一键部署到 Streamlit Cloud")
+st.caption("流程：preflight -> 版本摘要(可选) -> git add/commit/push -> (可选)打开应用链接")
+
+col_a, col_b = st.columns(2)
+deploy_remote = col_a.text_input("Git remote", value="xjtlu-marks")
+deploy_branch = col_b.text_input("Branch", value="master")
+app_url = st.text_input("Streamlit App URL（可选）", value="")
+
+col_c, col_d = st.columns(2)
+auto_release = col_c.checkbox("部署前自动生成版本摘要", value=True)
+dry_run = col_d.checkbox("Dry run（仅模拟，不推送）", value=False)
+
+if st.button("一键部署（自动触发云端重部署）", use_container_width=True):
+    project_dir = Path(__file__).resolve().parents[1]
+    result = one_click_deploy(
+        project_dir=project_dir,
+        remote=deploy_remote.strip() or "xjtlu-marks",
+        branch=deploy_branch.strip() or "master",
+        app_url=app_url.strip(),
+        auto_release=auto_release,
+        bump=bump_level,
+        dry_run=dry_run,
+    )
+
+    if result.get("ok"):
+        st.success(result.get("message", "部署成功"))
+    else:
+        st.error(result.get("message", "部署失败"))
+
+    if result.get("note"):
+        st.warning(result["note"])
+
+    st.code(result.get("log", "(no logs)"), language="text")

@@ -13,6 +13,7 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Cloud log file upload (.txt/.log) and confidence scoring.
 - One-click export for diagnosis report.
 - One-click version/changelog generation via Release Center.
+- One-click deploy pipeline (preflight + add/commit/push) via Release Center.
 - Lightweight runtime analytics (in-memory, no database).
 
 ## Local Run
@@ -40,6 +41,14 @@ One-click release assets:
 ```bash
 python GradeEstimate/release_tools.py
 ```
+
+One-click deploy (CLI):
+
+```bash
+python GradeEstimate/deploy_tools.py --remote xjtlu-marks --branch master
+```
+
+Tip: for the first deployment, bind repository in Streamlit Community Cloud manually once; afterwards, each push triggers auto-redeploy.
 
 3. Open browser:
 
