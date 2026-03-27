@@ -74,7 +74,9 @@ def render_header() -> None:
     st.markdown(
         """
         <div class="hint-card">
-            固定模型参数：rho = 0.75。采用 99 分封顶量化（score/99），即 99 → 1。
+            当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
+            已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
+            固定展示参数：rho = 0.75；评分口径仍为 99 分封顶量化（score/99）。
         </div>
         """,
         unsafe_allow_html=True,
@@ -112,8 +114,9 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
 
     st.caption(
         f"双科平均分: {result['avg_score']:.2f} | 相关系数 rho: {result['rho']:.2f} | "
-        f"量化均分: {result['q_avg_score']:.4f} (99→1) | 量化联合标准差: {result['q_std_s']:.4f}"
+        f"量化均分: {result['q_avg_score']:.4f} (99→1) | 模型: {result['model_mode']}"
     )
+    st.caption("并列名次规则：同分同名次，后续名次按人数跳号。")
 
     report_text = (
         "XJTLU Marks Rank Estimator Report\n"
@@ -122,6 +125,7 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
         f"Average score: {result['avg_score']:.2f}\n"
         f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
+        f"Model mode: {result['model_mode']}\n"
         f"Estimated rank: #{result['rank']}\n"
         f"Beat ratio: {result['beat_ratio'] * 100:.2f}%\n"
         f"Base students: {result['total_students']}\n"
@@ -133,7 +137,14 @@ def render_result(score1: int, score2: int, total_students: int, rho: float = 0.
         mime="text/plain",
     )
 
-    fig = generate_plot(score1, score2, rho=rho)
+    fig = generate_plot(
+        score1,
+        score2,
+        total_students=total_students,
+        smooth=True,
+        use_second_calibration=True,
+        rho=rho,
+    )
     st.pyplot(fig, clear_figure=True, use_container_width=True)
 
 

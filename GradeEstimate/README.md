@@ -7,7 +7,10 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Input two course scores and estimate rank instantly.
 - Integer-only inputs for scores and total population.
 - Default initial inputs: `0`, `0`, `3006`.
-- Uses a normal-distribution-based combined model.
+- Uses a discrete distribution model built from grouped frequency tables.
+- Ranking rule is competition rank (same score, same rank; next rank skips).
+- Model path: A+B (percentile lookup first, then linear interpolation inside segments).
+- Second calibration enabled: high-score tail inflation to reduce top-end rank collapse.
 - Fixed correlation coefficient: rho = 0.75.
 - Quantized scoring model: `quantized_score = score / 99`, so input 99 gives 1.
 - Plot labels are in English to avoid cloud font issues.
@@ -72,13 +75,18 @@ After app starts, open the Streamlit page named `Cloud Checklist` in the left pa
 
 ## Model Notes
 
-- Base population: 3009.
+- Base population still defaults to 3006 (user editable).
 - Maximum score is treated as 99 for quantization.
-- Means and estimated std are derived from grouped score tables.
-- Ranking is computed from upper-tail probability of combined score distribution.
+- Joint average-score distribution is constructed from grouped frequencies of MTH007 and MTH013.
+- Main ranking path is data-driven discrete lookup (A) with optional segment interpolation (B).
+- Secondary calibration adjusts high-score tail for better separation near 98-99.
+- Competition rank is computed by strict higher-score ratio: `rank = floor(total * P(score > x)) + 1`.
+- Hard constraint: `99/99 -> rank #1`.
 
 ## Smoke Test
 
-Use score 93 / 93 with rho 0.75:
+Suggested checks:
 
-- Expected rank around #240.
+- `99/99` should always return `#1`.
+- Same input score pair should return exactly the same rank across runs.
+- High-score inputs like `98/99` should be more stable than Gaussian-tail behavior.
