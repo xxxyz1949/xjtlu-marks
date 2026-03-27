@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-
 from rank_estimate import DIST, MAX_SCORE, get_rank_curve
 
 
@@ -12,6 +10,8 @@ def generate_plot(
 	rho: float = 0.75,
 ):
 	"""Generate ranking plot under discrete distribution model."""
+	import matplotlib.pyplot as plt
+
 	avg_score = (score1 + score2) / 2
 	rank_curve = get_rank_curve(
 		total_students=total_students,
@@ -24,7 +24,7 @@ def generate_plot(
 	x = rank_curve["x"]
 	higher_ratio = rank_curve["higher_ratio"]
 
-	fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+	fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6.2), sharex=True)
 
 	ax1.bar(scores, probs, width=2.0, color="#2f80ed", alpha=0.85, label="Discrete probability mass")
 	ax1.axvline(avg_score, color="#d1495b", linestyle="-", linewidth=2, label=f"Your avg score: {avg_score:.2f}")

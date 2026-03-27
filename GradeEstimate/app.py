@@ -1,12 +1,31 @@
 import streamlit as st
 import datetime as dt
+from io import BytesIO
 
 from analytics import register_prediction, register_visit, snapshot
 from rank_estimate import calculate_rank
-from plot_visual import generate_plot
 
 
 FIXED_TOTAL_STUDENTS = 3006
+
+
+@st.cache_data(show_spinner=False)
+def build_plot_png(score1: int, score2: int, rho: float) -> bytes:
+    from plot_visual import generate_plot
+    import matplotlib.pyplot as plt
+
+    fig = generate_plot(
+        score1,
+        score2,
+        total_students=FIXED_TOTAL_STUDENTS,
+        smooth=True,
+        use_second_calibration=True,
+        rho=rho,
+    )
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", dpi=130, bbox_inches="tight")
+    plt.close(fig)
+    return buffer.getvalue()
 
 
 def apply_page_style() -> None:
@@ -138,15 +157,8 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
         mime="text/plain",
     )
 
-    fig = generate_plot(
-        score1,
-        score2,
-        total_students=FIXED_TOTAL_STUDENTS,
-        smooth=True,
-        use_second_calibration=True,
-        rho=rho,
-    )
-    st.pyplot(fig, clear_figure=True, use_container_width=True)
+    chart_png = build_plot_png(score1, score2, rho)
+    st.image(chart_png, use_container_width=True)
 
 
 def main() -> None:

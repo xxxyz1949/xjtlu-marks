@@ -20,6 +20,7 @@ MID_HIGH_CLUSTER_HIGH = 87.0
 MID_HIGH_CLUSTER_CENTER = 85.0
 MID_HIGH_CLUSTER_SIGMA = 1.25
 MID_HIGH_CLUSTER_STRENGTH = 0.9
+RANK_CURVE_POINTS = 260
 
 
 def _build_joint_avg_distribution() -> dict:
@@ -164,7 +165,7 @@ def get_rank_curve(
     use_second_calibration: bool = True,
 ) -> dict:
     """返回可用于绘图的离散/平滑排名曲线数据。"""
-    x = np.linspace(0, MAX_SCORE, 500)
+    x = np.linspace(0, MAX_SCORE, RANK_CURVE_POINTS)
     higher = []
     rank = []
     for xi in x:
