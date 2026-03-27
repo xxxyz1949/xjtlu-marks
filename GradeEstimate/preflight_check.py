@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 REQUIRED_MODULES = ["streamlit", "numpy", "scipy", "matplotlib"]
+LAST_REPORT_FILE = Path("GradeEstimate/.preflight_last.txt")
 REQUIRED_FILES = [
     Path("GradeEstimate/app.py"),
     Path("GradeEstimate/analytics.py"),
@@ -49,7 +50,8 @@ def check_entry_signature() -> list[str]:
 
 
 def main() -> int:
-    print("== Preflight check for Streamlit deploy ==")
+    report_lines = ["== Preflight check for Streamlit deploy =="]
+    print(report_lines[0])
 
     failures = []
     failures.extend(check_modules())
@@ -59,13 +61,27 @@ def main() -> int:
     if failures:
         for item in failures:
             print(item)
+            report_lines.append(item)
         print("\nPreflight: FAILED")
+        report_lines.append("")
+        report_lines.append("Preflight: FAILED")
+        LAST_REPORT_FILE.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
         return 1
 
     print("[PASS] module imports")
     print("[PASS] required files")
     print("[PASS] app entry signature")
     print("\nPreflight: PASSED")
+    report_lines.extend(
+        [
+            "[PASS] module imports",
+            "[PASS] required files",
+            "[PASS] app entry signature",
+            "",
+            "Preflight: PASSED",
+        ]
+    )
+    LAST_REPORT_FILE.write_text("\n".join(report_lines) + "\n", encoding="utf-8")
     return 0
 
 

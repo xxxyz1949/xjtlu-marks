@@ -4,6 +4,30 @@ from pathlib import Path
 import streamlit as st
 
 
+LAST_REPORT_FILE = Path(__file__).resolve().parents[1] / ".preflight_last.txt"
+
+
+def parse_fail_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip().startswith("[FAIL]")]
+
+
+def suggest_fixes(fail_lines: list[str]) -> list[str]:
+    suggestions = []
+    joined = "\n".join(fail_lines).lower()
+
+    if "module import" in joined:
+        suggestions.append("运行 `python -m pip install -r GradeEstimate/requirements.txt` 重新安装依赖。")
+    if "missing file" in joined:
+        suggestions.append("确认缺失文件已提交到仓库，并检查 Cloud Main file path 为 GradeEstimate/app.py。")
+    if "app entry" in joined:
+        suggestions.append("检查 app.py 是否包含 `def main()` 与 `if __name__ == \"__main__\"`。")
+
+    if not suggestions and fail_lines:
+        suggestions.append("先执行下方可复制排障命令，再把完整日志贴回排障页分析。")
+
+    return suggestions
+
+
 st.set_page_config(page_title="Deployment Error Help", page_icon="🛠️", layout="centered")
 
 st.title("部署失败排障页")
@@ -88,6 +112,26 @@ if st.button("运行 preflight_check.py", use_container_width=True):
     else:
         st.error("Preflight 未通过，请按上方错误类型逐项排查")
     st.code(output.strip() or "(no output)", language="text")
+
+st.subheader("最近一次 Preflight 报告")
+if LAST_REPORT_FILE.exists():
+    last_report = LAST_REPORT_FILE.read_text(encoding="utf-8")
+    fail_lines = parse_fail_lines(last_report)
+
+    if fail_lines:
+        st.error(f"检测到 {len(fail_lines)} 个失败项")
+        for item in fail_lines:
+            st.markdown(f"- :red[{item}]")
+
+        st.markdown("**最可能修复步骤**")
+        for step in suggest_fixes(fail_lines):
+            st.markdown(f"- {step}")
+    else:
+        st.success("最近一次检查无失败项")
+
+    st.code(last_report.strip(), language="text")
+else:
+    st.info("尚无历史 preflight 报告，先点击上方按钮执行一次。")
 
 st.subheader("可复制排障命令")
 troubleshoot_cmds = """python GradeEstimate/preflight_check.py
