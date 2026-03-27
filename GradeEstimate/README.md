@@ -7,6 +7,7 @@ A lightweight Streamlit web app to estimate ranking from MTH007 and MTH013 score
 - Input two course scores and estimate rank instantly.
 - Uses a normal-distribution-based combined model.
 - Fixed correlation coefficient: rho = 0.75.
+- Quantized scoring model: `quantized_score = score / 99`, so input 99 gives 1.
 - Plot labels are in English to avoid cloud font issues.
 - Visual deployment error help page in Streamlit pages.
 - Semi-automatic Cloud log diagnosis with prioritized repair checklist.
@@ -70,6 +71,7 @@ After app starts, open the Streamlit page named `Cloud Checklist` in the left pa
 ## Model Notes
 
 - Base population: 3009.
+- Maximum score is treated as 99 for quantization.
 - Means and estimated std are derived from grouped score tables.
 - Ranking is computed from upper-tail probability of combined score distribution.
 

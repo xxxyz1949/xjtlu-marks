@@ -74,7 +74,7 @@ def render_header() -> None:
     st.markdown(
         """
         <div class="hint-card">
-            固定模型参数：rho = 0.75，参考人数 3009。建议先用 93 / 93 做基准测试。
+            固定模型参数：rho = 0.75，参考人数 3009。采用 99 分封顶量化（score/99），即 99 → 1。
         </div>
         """,
         unsafe_allow_html=True,
@@ -85,10 +85,10 @@ def validate_scores(score1: float, score2: float):
     errors = []
     warnings = []
 
-    if not (0 <= score1 <= 100):
-        errors.append("MTH007 分数必须在 0 到 100 之间。")
-    if not (0 <= score2 <= 100):
-        errors.append("MTH013 分数必须在 0 到 100 之间。")
+    if not (0 <= score1 <= 99):
+        errors.append("MTH007 分数必须在 0 到 99 之间。")
+    if not (0 <= score2 <= 99):
+        errors.append("MTH013 分数必须在 0 到 99 之间。")
 
     if score1 < 20:
         warnings.append("MTH007 分数较低，请确认是否输入正确。")
@@ -109,7 +109,7 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
 
     st.caption(
         f"双科平均分: {result['avg_score']:.2f} | 相关系数 rho: {result['rho']:.2f} | "
-        f"联合分布标准差: {result['std_s']:.2f}"
+        f"量化均分: {result['q_avg_score']:.4f} (99→1) | 量化联合标准差: {result['q_std_s']:.4f}"
     )
 
     report_text = (
@@ -117,6 +117,7 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
         f"MTH007: {result['score1']:.2f}\n"
         f"MTH013: {result['score2']:.2f}\n"
         f"Average score: {result['avg_score']:.2f}\n"
+        f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
         f"Estimated rank: #{result['rank']}\n"
         f"Beat ratio: {result['beat_ratio'] * 100:.2f}%\n"
@@ -155,8 +156,8 @@ def main() -> None:
 
     with st.form("score_form"):
         left, right = st.columns([1, 1], gap="small")
-        score1 = left.number_input("MTH007 分数", min_value=0.0, max_value=100.0, value=93.0, step=0.5)
-        score2 = right.number_input("MTH013 分数", min_value=0.0, max_value=100.0, value=93.0, step=0.5)
+        score1 = left.number_input("MTH007 分数", min_value=0.0, max_value=99.0, value=93.0, step=0.5)
+        score2 = right.number_input("MTH013 分数", min_value=0.0, max_value=99.0, value=93.0, step=0.5)
         submitted = st.form_submit_button("一键估算排名", use_container_width=True)
 
     if submitted:
