@@ -76,6 +76,12 @@ def apply_page_style() -> None:
             .hero-sub {
                 font-size: 0.95rem;
             }
+            section[data-testid="stSidebar"] {
+                display: none;
+            }
+            button[data-testid="collapsedControl"] {
+                display: none;
+            }
         }
         </style>
         """,
@@ -172,7 +178,12 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="XJTLU Marks Rank Estimator", page_icon="📊", layout="wide")
+    st.set_page_config(
+        page_title="XJTLU Marks Rank Estimator",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
     register_visit()
     apply_page_style()
     render_header()
@@ -181,15 +192,17 @@ def main() -> None:
         st.subheader("导航")
         st.write("可在左侧页面列表打开 Cloud Checklist 页面。")
         st.write("发布前可运行 preflight_check.py 进行一键检查。")
-        stats = snapshot()
         st.divider()
-        st.subheader("轻量访问统计")
-        st.metric("运行期总访问", stats["total_visits"])
-        st.metric("运行期总预测", stats["total_predictions"])
-        st.metric("本会话预测次数", stats["session_predictions"])
-        start_text = dt.datetime.fromtimestamp(stats["session_start_ts"]).strftime("%H:%M:%S")
-        st.caption(f"会话开始: {start_text}")
-        st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
+        show_stats = st.checkbox("显示运行统计", value=False)
+        if show_stats:
+            stats = snapshot()
+            st.subheader("轻量访问统计")
+            st.metric("运行期总访问", stats["total_visits"])
+            st.metric("运行期总预测", stats["total_predictions"])
+            st.metric("本会话预测次数", stats["session_predictions"])
+            start_text = dt.datetime.fromtimestamp(stats["session_start_ts"]).strftime("%H:%M:%S")
+            st.caption(f"会话开始: {start_text}")
+            st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
     left, right = st.columns([1, 1], gap="small")
     score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
