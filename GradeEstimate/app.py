@@ -4,6 +4,81 @@ from rank_estimate import calculate_rank
 from plot_visual import generate_plot
 
 
+def apply_page_style() -> None:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background:
+                radial-gradient(1200px 500px at 10% -20%, #d7eefb 0%, transparent 60%),
+                radial-gradient(900px 450px at 100% 0%, #ffe9c7 0%, transparent 60%),
+                #f8fafc;
+        }
+        .hero-card {
+            background: linear-gradient(135deg, #0f4c81 0%, #1d7ab6 60%, #38a3d1 100%);
+            border-radius: 18px;
+            padding: 20px 22px;
+            color: #ffffff;
+            box-shadow: 0 10px 24px rgba(15, 76, 129, 0.22);
+            margin-bottom: 14px;
+        }
+        .hero-title {
+            font-size: 1.8rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 6px;
+        }
+        .hero-sub {
+            font-size: 1rem;
+            opacity: 0.95;
+            margin: 0;
+        }
+        .hint-card {
+            background: #ffffff;
+            border: 1px solid #dbe7ef;
+            border-radius: 12px;
+            padding: 10px 12px;
+            color: #1f2a37;
+            margin-bottom: 10px;
+        }
+        @media (max-width: 768px) {
+            .hero-card {
+                padding: 16px;
+                border-radius: 14px;
+            }
+            .hero-title {
+                font-size: 1.4rem;
+            }
+            .hero-sub {
+                font-size: 0.95rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_header() -> None:
+    st.markdown(
+        """
+        <div class="hero-card">
+            <div class="hero-title">XJTLU 双科成绩排名估算</div>
+            <p class="hero-sub">输入 MTH007 与 MTH013 分数，快速获得预估名次、超越比例与分布图。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div class="hint-card">
+            固定模型参数：rho = 0.75，参考人数 3009。建议先用 93 / 93 做基准测试。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def validate_scores(score1: float, score2: float):
     errors = []
     warnings = []
@@ -58,15 +133,19 @@ def render_result(score1: float, score2: float, rho: float = 0.75) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="XJTLU Marks Rank Estimator", page_icon="📊", layout="wide")
+    apply_page_style()
+    render_header()
 
-    st.title("西浦双科成绩排名估算")
-    st.write("输入 MTH007 与 MTH013 分数，系统将基于正态分布模型输出预估排名。")
+    with st.sidebar:
+        st.subheader("导航")
+        st.write("可在左侧页面列表打开 Cloud Checklist 页面。")
+        st.write("发布前可运行 preflight_check.py 进行一键检查。")
 
     with st.form("score_form"):
-        left, right = st.columns(2)
+        left, right = st.columns([1, 1], gap="small")
         score1 = left.number_input("MTH007 分数", min_value=0.0, max_value=100.0, value=93.0, step=0.5)
         score2 = right.number_input("MTH013 分数", min_value=0.0, max_value=100.0, value=93.0, step=0.5)
-        submitted = st.form_submit_button("一键估算排名")
+        submitted = st.form_submit_button("一键估算排名", use_container_width=True)
 
     if submitted:
         errors, warnings = validate_scores(score1, score2)

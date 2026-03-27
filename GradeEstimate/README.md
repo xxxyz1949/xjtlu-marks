@@ -23,6 +23,12 @@ python -m pip install -r GradeEstimate/requirements.txt
 python -m streamlit run GradeEstimate/app.py
 ```
 
+Optional preflight check before deploy:
+
+```bash
+python GradeEstimate/preflight_check.py
+```
+
 3. Open browser:
 
 - http://localhost:8501
@@ -37,6 +43,8 @@ python -m streamlit run GradeEstimate/app.py
 - `GradeEstimate/app.py`
 
 5. Click Deploy.
+
+After app starts, open the Streamlit page named `Cloud Checklist` in the left page list and tick items one by one.
 
 ## Model Notes
 
