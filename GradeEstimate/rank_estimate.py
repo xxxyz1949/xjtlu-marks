@@ -15,8 +15,10 @@ MAX_SCORE = 99.0
 SECOND_CALIBRATION_THRESHOLD = 82.0
 SECOND_CALIBRATION_ALPHA = 4.2
 SECOND_CALIBRATION_GAMMA = 0.9
-MID_HIGH_CLUSTER_CENTER = 86.0
-MID_HIGH_CLUSTER_SIGMA = 1.1
+MID_HIGH_CLUSTER_LOW = 83.0
+MID_HIGH_CLUSTER_HIGH = 87.0
+MID_HIGH_CLUSTER_CENTER = 85.0
+MID_HIGH_CLUSTER_SIGMA = 1.25
 MID_HIGH_CLUSTER_STRENGTH = 0.9
 
 
@@ -59,9 +61,10 @@ def _build_joint_avg_distribution() -> dict:
 
 
 def _apply_mid_high_cluster(probs: np.ndarray, scores: np.ndarray) -> np.ndarray:
-    """在 85~87 附近加入局部拥挤度，反映该分段人数偏多。"""
+    """在 83~87 附近加入局部拥挤度，反映该分段人数偏多。"""
+    window = ((scores >= MID_HIGH_CLUSTER_LOW) & (scores <= MID_HIGH_CLUSTER_HIGH)).astype(float)
     gauss = np.exp(-0.5 * ((scores - MID_HIGH_CLUSTER_CENTER) / MID_HIGH_CLUSTER_SIGMA) ** 2)
-    bump = 1.0 + MID_HIGH_CLUSTER_STRENGTH * gauss
+    bump = 1.0 + MID_HIGH_CLUSTER_STRENGTH * gauss * window
     adjusted = probs * bump
     adjusted /= adjusted.sum()
     return adjusted
