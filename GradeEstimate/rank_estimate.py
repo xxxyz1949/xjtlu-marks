@@ -61,6 +61,12 @@ def calculate_rank(score1: float, score2: float, rho: float = 0.75) -> dict:
     beat_ratio = 1 - upper_tail
     rank = int(stats_base["total_students"] * upper_tail) + 1
 
+    # 业务硬约束：双科都达到最高分(99)时，名次直接判定为第1名。
+    if score1 >= MAX_SCORE and score2 >= MAX_SCORE:
+        upper_tail = 0.0
+        beat_ratio = 1.0
+        rank = 1
+
     return {
         "score1": score1,
         "score2": score2,
