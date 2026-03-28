@@ -3,11 +3,31 @@ import datetime as dt
 from io import BytesIO
 
 from analytics import register_prediction, register_visit, snapshot
-from rank_estimate import calculate_rank, get_profile_meta
+import rank_estimate
 
 
 FIXED_TOTAL_STUDENTS = 3006
 PROFILE_ORDER = ["mth007_013", "mth017_029"]
+PROFILE_META_FALLBACK = {
+    "mth007_013": {"subject1": "MTH007", "subject2": "MTH013"},
+    "mth017_029": {"subject1": "MTH017", "subject2": "MTH029"},
+}
+
+
+def _get_profile_meta_safe(profile: str) -> dict:
+    getter = getattr(rank_estimate, "get_profile_meta", None)
+    if callable(getter):
+        return getter(profile)
+    if profile in PROFILE_META_FALLBACK:
+        meta = PROFILE_META_FALLBACK[profile]
+        return {
+            "profile": profile,
+            "subject1": meta["subject1"],
+            "subject2": meta["subject2"],
+            "n1": FIXED_TOTAL_STUDENTS,
+            "n2": FIXED_TOTAL_STUDENTS,
+        }
+    raise ValueError(f"Unsupported profile: {profile}")
 
 
 @st.cache_data(show_spinner=False)
@@ -139,9 +159,9 @@ def render_result(
     key_prefix: str,
     rho: float = 0.75,
 ) -> None:
-    meta = get_profile_meta(profile)
+    meta = _get_profile_meta_safe(profile)
     try:
-        result = calculate_rank(
+        result = rank_estimate.calculate_rank(
             score1,
             score2,
             total_students=FIXED_TOTAL_STUDENTS,
@@ -252,7 +272,7 @@ def main() -> None:
         errors = []
         warnings = []
         for profile in PROFILE_ORDER:
-            meta = get_profile_meta(profile)
+            meta = _get_profile_meta_safe(profile)
             pair_input = current_input[profile]
             e, w = validate_scores(pair_input["score1"], pair_input["score2"], meta["subject1"], meta["subject2"])
             errors.extend(e)
