@@ -6,7 +6,10 @@ from analytics import register_prediction, register_visit, snapshot
 import rank_estimate
 
 
-FIXED_TOTAL_STUDENTS = 3006
+PROFILE_TOTAL_STUDENTS = {
+    "mth007_013": 3006,
+    "mth017_029": 540,
+}
 PROFILE_ORDER = ["mth007_013", "mth017_029"]
 PROFILE_META_FALLBACK = {
     "mth007_013": {"subject1": "MTH007", "subject2": "MTH013"},
@@ -24,8 +27,8 @@ def _get_profile_meta_safe(profile: str) -> dict:
             "profile": profile,
             "subject1": meta["subject1"],
             "subject2": meta["subject2"],
-            "n1": FIXED_TOTAL_STUDENTS,
-            "n2": FIXED_TOTAL_STUDENTS,
+            "n1": PROFILE_TOTAL_STUDENTS.get(profile, 3006),
+            "n2": PROFILE_TOTAL_STUDENTS.get(profile, 3006),
         }
     raise ValueError(f"Unsupported profile: {profile}")
 
@@ -38,7 +41,7 @@ def build_plot_png(score1: int, score2: int, rho: float, profile: str) -> bytes:
     fig = generate_plot(
         score1,
         score2,
-        total_students=FIXED_TOTAL_STUDENTS,
+        total_students=PROFILE_TOTAL_STUDENTS.get(profile, 3006),
         smooth=True,
         use_second_calibration=True,
         rho=rho,
@@ -160,11 +163,12 @@ def render_result(
     rho: float = 0.75,
 ) -> None:
     meta = _get_profile_meta_safe(profile)
+    total_students = PROFILE_TOTAL_STUDENTS.get(profile, 3006)
     try:
         result = rank_estimate.calculate_rank(
             score1,
             score2,
-            total_students=FIXED_TOTAL_STUDENTS,
+            total_students=total_students,
             rho=rho,
             profile=profile,
         )
@@ -250,7 +254,10 @@ def main() -> None:
     score_017 = p2_left.number_input("MTH017 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
     score_029 = p2_right.number_input("MTH029 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
 
-    st.caption(f"总人数固定为 {FIXED_TOTAL_STUDENTS}（不可修改）")
+    st.caption(
+        f"总人数固定：MTH007+MTH013 = {PROFILE_TOTAL_STUDENTS['mth007_013']}；"
+        f"MTH017+MTH029 = {PROFILE_TOTAL_STUDENTS['mth017_029']}（不可修改）"
+    )
     submitted = st.button("一键估算排名（两组同时）", use_container_width=True, type="primary")
 
     if "last_valid_result_input" not in st.session_state:
