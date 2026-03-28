@@ -1,4 +1,4 @@
-from rank_estimate import DIST, MAX_SCORE, get_rank_curve
+from rank_estimate import MAX_SCORE, get_distribution, get_rank_curve
 
 
 def generate_plot(
@@ -8,6 +8,7 @@ def generate_plot(
 	smooth: bool = True,
 	use_second_calibration: bool = True,
 	rho: float = 0.75,
+	profile: str = "mth017_029",
 ):
 	"""Generate ranking plot under discrete distribution model."""
 	import matplotlib.pyplot as plt
@@ -17,10 +18,12 @@ def generate_plot(
 		total_students=total_students,
 		smooth=smooth,
 		use_second_calibration=use_second_calibration,
+		profile=profile,
 	)
 
-	scores = DIST["scores"]
-	probs = DIST["probs"]
+	dist = get_distribution(profile)
+	scores = dist["scores"]
+	probs = dist["probs"]
 	x = rank_curve["x"]
 	higher_ratio = rank_curve["higher_ratio"]
 
@@ -53,6 +56,6 @@ def generate_plot(
 
 if __name__ == "__main__":
 	output_path = "E:/GradeEstimate/distribution_visual.png"
-	chart = generate_plot(99, 99, total_students=3006, smooth=True, use_second_calibration=True, rho=0.75)
+	chart = generate_plot(99, 99, total_students=3006, smooth=True, use_second_calibration=True, rho=0.75, profile="mth017_029")
 	chart.savefig(output_path, dpi=300)
 	print(f"Saved plot to: {output_path}")

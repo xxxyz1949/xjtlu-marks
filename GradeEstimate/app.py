@@ -3,14 +3,15 @@ import datetime as dt
 from io import BytesIO
 
 from analytics import register_prediction, register_visit, snapshot
-from rank_estimate import calculate_rank
+from rank_estimate import calculate_rank, get_profile_meta
 
 
 FIXED_TOTAL_STUDENTS = 3006
+PROFILE_ORDER = ["mth007_013", "mth017_029"]
 
 
 @st.cache_data(show_spinner=False)
-def build_plot_png(score1: int, score2: int, rho: float) -> bytes:
+def build_plot_png(score1: int, score2: int, rho: float, profile: str) -> bytes:
     from plot_visual import generate_plot
     import matplotlib.pyplot as plt
 
@@ -21,6 +22,7 @@ def build_plot_png(score1: int, score2: int, rho: float) -> bytes:
         smooth=True,
         use_second_calibration=True,
         rho=rho,
+        profile=profile,
     )
     buffer = BytesIO()
     fig.savefig(buffer, format="png", dpi=130, bbox_inches="tight")
@@ -94,7 +96,7 @@ def render_header() -> None:
         """
         <div class="hero-card">
             <div class="hero-title">XJTLU 双科成绩排名估算</div>
-            <p class="hero-sub">输入 MTH017 与 MTH029 分数，快速获得预估名次、超越比例与分布图。</p>
+            <p class="hero-sub">同时输入 MTH007+MTH013 与 MTH017+MTH029 分数，分别获得两组预估名次。</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -104,6 +106,7 @@ def render_header() -> None:
         <div class="hint-card">
             当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
             已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
+            当前页面同时展示两组课程：MTH007+MTH013 与 MTH017+MTH029。
             固定展示参数：rho = 0.75；评分口径仍为 99 分封顶量化（score/99）。
         </div>
         """,
@@ -111,31 +114,45 @@ def render_header() -> None:
     )
 
 
-def validate_scores(score1: int, score2: int):
+def validate_scores(score1: int, score2: int, subject1: str, subject2: str):
     errors = []
     warnings = []
 
     if not (0 <= score1 <= 99):
-        errors.append("MTH017 分数必须在 0 到 99 之间。")
+        errors.append(f"{subject1} 分数必须在 0 到 99 之间。")
     if not (0 <= score2 <= 99):
-        errors.append("MTH029 分数必须在 0 到 99 之间。")
+        errors.append(f"{subject2} 分数必须在 0 到 99 之间。")
 
     if score1 < 20:
-        warnings.append("MTH017 分数较低，请确认是否输入正确。")
+        warnings.append(f"{subject1} 分数较低，请确认是否输入正确。")
     if score2 < 20:
-        warnings.append("MTH029 分数较低，请确认是否输入正确。")
+        warnings.append(f"{subject2} 分数较低，请确认是否输入正确。")
 
     return errors, warnings
 
 
-def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
+def render_result(
+    score1: int,
+    score2: int,
+    profile: str,
+    section_title: str,
+    key_prefix: str,
+    rho: float = 0.75,
+) -> None:
+    meta = get_profile_meta(profile)
     try:
-        result = calculate_rank(score1, score2, total_students=FIXED_TOTAL_STUDENTS, rho=rho)
+        result = calculate_rank(
+            score1,
+            score2,
+            total_students=FIXED_TOTAL_STUDENTS,
+            rho=rho,
+            profile=profile,
+        )
     except Exception:
-        st.error("预测结果计算失败，请点击“一键估算排名”重试。")
+        st.error(f"{section_title} 预测结果计算失败，请点击“一键估算排名”重试。")
         return
 
-    st.subheader("预测结果")
+    st.subheader(f"{section_title} 预测结果")
     col1, col2, col3 = st.columns(3)
     col1.metric("预估名次", f"第 {result['rank']} 名")
     col2.metric("超越比例", f"{result['beat_ratio'] * 100:.2f}%")
@@ -149,8 +166,9 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
 
     report_text = (
         "XJTLU Marks Rank Estimator Report\n"
-        f"MTH017: {result['score1']}\n"
-        f"MTH029: {result['score2']}\n"
+        f"Profile: {profile}\n"
+        f"{meta['subject1']}: {result['score1']}\n"
+        f"{meta['subject2']}: {result['score2']}\n"
         f"Average score: {result['avg_score']:.2f}\n"
         f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
@@ -160,17 +178,18 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
         f"Base students: {result['total_students']}\n"
     )
     st.download_button(
-        "下载本次预测结果",
+        f"下载 {section_title} 预测结果",
         data=report_text,
-        file_name="rank_prediction_report.txt",
+        file_name=f"rank_prediction_report_{profile}.txt",
         mime="text/plain",
+        key=f"download_{key_prefix}",
     )
 
-    with st.expander("分布图（按需加载，手机端建议需要时再展开）", expanded=False):
+    with st.expander(f"{section_title} 分布图（按需加载，手机端建议需要时再展开）", expanded=False):
         st.caption("图表加载失败不会影响上方名次结果。")
         try:
             with st.spinner("正在生成分布图..."):
-                chart_png = build_plot_png(score1, score2, rho)
+                chart_png = build_plot_png(score1, score2, rho, profile)
             st.image(chart_png, use_container_width=True)
         except Exception:
             st.warning("分布图生成失败，请稍后重试；名次结果已正常给出。")
@@ -203,45 +222,105 @@ def main() -> None:
             st.caption(f"会话开始: {start_text}")
             st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
-    left, right = st.columns([1, 1], gap="small")
-    score1 = left.number_input("MTH017 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-    score2 = right.number_input("MTH029 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-    st.caption(f"总人数固定为 {FIXED_TOTAL_STUDENTS}（不可修改）")
-    submitted = st.button("一键估算排名", use_container_width=True, type="primary")
+    p1_left, p1_right = st.columns([1, 1], gap="small")
+    score_007 = p1_left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    score_013 = p1_right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
 
-    if "last_submitted_input" not in st.session_state:
-        st.session_state["last_submitted_input"] = None
+    p2_left, p2_right = st.columns([1, 1], gap="small")
+    score_017 = p2_left.number_input("MTH017 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    score_029 = p2_right.number_input("MTH029 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+
+    st.caption(f"总人数固定为 {FIXED_TOTAL_STUDENTS}（不可修改）")
+    submitted = st.button("一键估算排名（两组同时）", use_container_width=True, type="primary")
+
     if "last_valid_result_input" not in st.session_state:
         st.session_state["last_valid_result_input"] = None
 
-    last_submitted = st.session_state["last_submitted_input"]
     last_valid_result = st.session_state["last_valid_result_input"]
     current_input = {
-        "score1": int(score1),
-        "score2": int(score2),
+        "mth007_013": {
+            "score1": int(score_007),
+            "score2": int(score_013),
+        },
+        "mth017_029": {
+            "score1": int(score_017),
+            "score2": int(score_029),
+        },
     }
 
     if submitted:
-        errors, warnings = validate_scores(score1, score2)
+        errors = []
+        warnings = []
+        for profile in PROFILE_ORDER:
+            meta = get_profile_meta(profile)
+            pair_input = current_input[profile]
+            e, w = validate_scores(pair_input["score1"], pair_input["score2"], meta["subject1"], meta["subject2"])
+            errors.extend(e)
+            warnings.extend(w)
+
         if errors:
             for msg in errors:
                 st.error(msg)
         else:
-            st.session_state["last_submitted_input"] = current_input
             st.session_state["last_valid_result_input"] = current_input
             for msg in warnings:
                 st.warning(msg)
             register_prediction()
-            render_result(score1, score2, rho=0.75)
+            render_result(
+                current_input["mth007_013"]["score1"],
+                current_input["mth007_013"]["score2"],
+                profile="mth007_013",
+                section_title="MTH007 + MTH013",
+                key_prefix="mth007_013",
+                rho=0.75,
+            )
+            render_result(
+                current_input["mth017_029"]["score1"],
+                current_input["mth017_029"]["score2"],
+                profile="mth017_029",
+                section_title="MTH017 + MTH029",
+                key_prefix="mth017_029",
+                rho=0.75,
+            )
     else:
         if last_valid_result is None:
             st.info("填写分数后点击“一键估算排名”查看结果。")
         elif current_input != last_valid_result:
-            st.info("你已修改输入，但尚未重新估算。当前展示的是上一次有效预测结果。")
-            render_result(last_valid_result["score1"], last_valid_result["score2"], rho=0.75)
+            st.info("你已修改输入，但尚未重新估算。当前展示的是上一次有效预测结果（两组）。")
+            render_result(
+                last_valid_result["mth007_013"]["score1"],
+                last_valid_result["mth007_013"]["score2"],
+                profile="mth007_013",
+                section_title="MTH007 + MTH013",
+                key_prefix="mth007_013_last",
+                rho=0.75,
+            )
+            render_result(
+                last_valid_result["mth017_029"]["score1"],
+                last_valid_result["mth017_029"]["score2"],
+                profile="mth017_029",
+                section_title="MTH017 + MTH029",
+                key_prefix="mth017_029_last",
+                rho=0.75,
+            )
         else:
-            st.info("当前输入与上次预测一致，已展示最新结果。")
-            render_result(current_input["score1"], current_input["score2"], rho=0.75)
+            st.info("当前输入与上次预测一致，已展示两组最新结果。")
+            render_result(
+                current_input["mth007_013"]["score1"],
+                current_input["mth007_013"]["score2"],
+                profile="mth007_013",
+                section_title="MTH007 + MTH013",
+                key_prefix="mth007_013_now",
+                rho=0.75,
+            )
+            render_result(
+                current_input["mth017_029"]["score1"],
+                current_input["mth017_029"]["score2"],
+                profile="mth017_029",
+                section_title="MTH017 + MTH029",
+                key_prefix="mth017_029_now",
+                rho=0.75,
+            )
 
 
 if __name__ == "__main__":

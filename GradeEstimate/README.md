@@ -1,10 +1,10 @@
 # XJTLU Marks Rank Estimator
 
-A lightweight Streamlit web app to estimate ranking from MTH017 and MTH029 scores.
+A lightweight Streamlit web app to estimate ranking for both MTH007+MTH013 and MTH017+MTH029.
 
 ## Features
 
-- Input two course scores and estimate rank instantly.
+- Input four course scores and estimate two ranking results instantly.
 - Integer-only inputs for scores and total population.
 - Default initial inputs: `0`, `0`, `3006`.
 - Uses a discrete distribution model built from grouped frequency tables.
@@ -77,7 +77,7 @@ After app starts, open the Streamlit page named `Cloud Checklist` in the left pa
 
 - Base population still defaults to 3006 (user editable).
 - Maximum score is treated as 99 for quantization.
-- Joint average-score distribution is constructed from grouped frequencies of MTH017 and MTH029.
+- Two joint average-score distributions are constructed from grouped frequencies of MTH007+MTH013 and MTH017+MTH029.
 - Main ranking path is data-driven discrete lookup (A) with optional segment interpolation (B).
 - Secondary calibration adjusts high-score tail for better separation near 98-99.
 - Competition rank is computed by strict higher-score ratio: `rank = floor(total * P(score > x)) + 1`.
