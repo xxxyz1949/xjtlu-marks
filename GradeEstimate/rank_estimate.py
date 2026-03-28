@@ -4,23 +4,17 @@ import numpy as np
 # === 基础统计常量（由分段表估算） ===
 MIDPOINTS = np.array([17, 37, 45, 55, 65, 75, 85, 95])
 BIN_EDGES = np.array([0, 30, 40, 50, 60, 70, 80, 90, 100])
-N1 = 3500
-MU1 = 68
-FREQ1 = np.array([176, 116, 348, 526, 584, 658, 607, 485])
+N1 = 583
+MU1 = 67
+FREQ1 = np.array([17, 6, 53, 113, 111, 151, 105, 27])
 
-N2 = 3009
-MU2 = 73
-FREQ2 = np.array([43, 16, 123, 270, 555, 937, 887, 178])
+N2 = 540
+MU2 = 74
+FREQ2 = np.array([6, 3, 29, 44, 88, 138, 178, 54])
 MAX_SCORE = 99.0
 SECOND_CALIBRATION_THRESHOLD = 82.0
 SECOND_CALIBRATION_ALPHA = 4.2
 SECOND_CALIBRATION_GAMMA = 0.9
-MID_HIGH_CLUSTER_LOW = 82.0
-MID_HIGH_CLUSTER_HIGH = 87.0
-MID_HIGH_CLUSTER_CENTER = 84.5
-MID_HIGH_CLUSTER_SIGMA = 2.0
-MID_HIGH_CLUSTER_FLAT_STRENGTH = 0.22
-MID_HIGH_CLUSTER_PEAK_STRENGTH = 0.18
 RANK_CURVE_POINTS = 260
 
 
@@ -52,7 +46,6 @@ def _build_joint_avg_distribution() -> dict:
     sum_scores = np.arange(sum_pmf.size)
     scores = sum_scores / 2.0
     probs = sum_pmf / sum_pmf.sum()
-    probs = _apply_mid_high_cluster(probs, scores)
     cdf = np.cumsum(probs)
 
     return {
@@ -60,16 +53,6 @@ def _build_joint_avg_distribution() -> dict:
         "probs": probs,
         "cdf": cdf,
     }
-
-
-def _apply_mid_high_cluster(probs: np.ndarray, scores: np.ndarray) -> np.ndarray:
-    """在 82~87 附近加入更平缓的局部拥挤度，反映该分段人数偏多。"""
-    window = ((scores >= MID_HIGH_CLUSTER_LOW) & (scores <= MID_HIGH_CLUSTER_HIGH)).astype(float)
-    gauss = np.exp(-0.5 * ((scores - MID_HIGH_CLUSTER_CENTER) / MID_HIGH_CLUSTER_SIGMA) ** 2)
-    bump = 1.0 + MID_HIGH_CLUSTER_FLAT_STRENGTH * window + MID_HIGH_CLUSTER_PEAK_STRENGTH * gauss * window
-    adjusted = probs * bump
-    adjusted /= adjusted.sum()
-    return adjusted
 
 
 DIST = _build_joint_avg_distribution()
@@ -293,8 +276,8 @@ if __name__ == "__main__":
     rhos = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9]
     base = _compute_base_stats()
 
-    print(f"MTH007 -> mean: {MU1}, std(est): {base['std1']:.2f}")
-    print(f"MTH013 -> mean: {MU2}, std(est): {base['std2']:.2f}")
+    print(f"MTH017 -> mean: {MU1}, std(est): {base['std1']:.2f}")
+    print(f"MTH029 -> mean: {MU2}, std(est): {base['std2']:.2f}")
     print(f"Your average score: {(score1 + score2) / 2:.2f}")
     print(f"Quantized average (99 -> 1): {((score1 + score2) / 2) / MAX_SCORE:.4f}")
     print("-" * 40)

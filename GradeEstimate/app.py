@@ -94,7 +94,7 @@ def render_header() -> None:
         """
         <div class="hero-card">
             <div class="hero-title">XJTLU 双科成绩排名估算</div>
-            <p class="hero-sub">输入 MTH007 与 MTH013 分数，快速获得预估名次、超越比例与分布图。</p>
+            <p class="hero-sub">输入 MTH017 与 MTH029 分数，快速获得预估名次、超越比例与分布图。</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -104,7 +104,6 @@ def render_header() -> None:
         <div class="hint-card">
             当前采用离散分布模型（先查表后段内线性插值），名次规则为并列名次（competition rank）。
             已启用二次校准：高分段尾部拉开，避免 98/99 与 99/99 过度重叠。
-            已启用 82-87 分段平化修正：体现该分段人数偏多且分布更平缓。
             固定展示参数：rho = 0.75；评分口径仍为 99 分封顶量化（score/99）。
         </div>
         """,
@@ -117,14 +116,14 @@ def validate_scores(score1: int, score2: int):
     warnings = []
 
     if not (0 <= score1 <= 99):
-        errors.append("MTH007 分数必须在 0 到 99 之间。")
+        errors.append("MTH017 分数必须在 0 到 99 之间。")
     if not (0 <= score2 <= 99):
-        errors.append("MTH013 分数必须在 0 到 99 之间。")
+        errors.append("MTH029 分数必须在 0 到 99 之间。")
 
     if score1 < 20:
-        warnings.append("MTH007 分数较低，请确认是否输入正确。")
+        warnings.append("MTH017 分数较低，请确认是否输入正确。")
     if score2 < 20:
-        warnings.append("MTH013 分数较低，请确认是否输入正确。")
+        warnings.append("MTH029 分数较低，请确认是否输入正确。")
 
     return errors, warnings
 
@@ -150,8 +149,8 @@ def render_result(score1: int, score2: int, rho: float = 0.75) -> None:
 
     report_text = (
         "XJTLU Marks Rank Estimator Report\n"
-        f"MTH007: {result['score1']}\n"
-        f"MTH013: {result['score2']}\n"
+        f"MTH017: {result['score1']}\n"
+        f"MTH029: {result['score2']}\n"
         f"Average score: {result['avg_score']:.2f}\n"
         f"Quantized average(score/99): {result['q_avg_score']:.4f}\n"
         f"rho: {result['rho']:.2f}\n"
@@ -205,8 +204,8 @@ def main() -> None:
             st.caption(f"会话停留: {stats['session_elapsed_sec']} 秒")
 
     left, right = st.columns([1, 1], gap="small")
-    score1 = left.number_input("MTH007 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
-    score2 = right.number_input("MTH013 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    score1 = left.number_input("MTH017 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
+    score2 = right.number_input("MTH029 分数", min_value=0, max_value=99, value=0, step=1, format="%d")
     st.caption(f"总人数固定为 {FIXED_TOTAL_STUDENTS}（不可修改）")
     submitted = st.button("一键估算排名", use_container_width=True, type="primary")
 
